@@ -759,8 +759,6 @@ class InsnQueue : public BaseQueue<VTAGenericInsn> {
 
     return "unknown op";
   }
-
-
   // Dump instructions in the queue
   void DumpInsn() {
     // Keep tabs on dependence queues
@@ -896,7 +894,6 @@ class InsnQueue : public BaseQueue<VTAGenericInsn> {
       printf("\ts2g_queue = %d, g2s_queue = %d\n", s2g_queue, g2s_queue);
     }
   }
-
   // Commit all pending pop of corresponding stage
   void CommitPendingPop(int stage) {
     // Handle the LD<->compute queue
@@ -1015,8 +1012,6 @@ class InsnQueue : public BaseQueue<VTAGenericInsn> {
   int pending_pop_next_[4];
   static constexpr int kElemBytes = sizeof(VTAGenericInsn);
   static constexpr int kMaxElems = kMaxBytes / kElemBytes;
-
-  friend class CommandQueue;
 };
 
 /*!
@@ -1344,7 +1339,6 @@ void VTABufferCopy(const void* from, size_t from_offset, void* to, size_t to_off
 
   if (from_buffer) {
     // This is an FPGA to host mem transfer
-    // NOTE: Issue synchronize manually as we delay the copy until we do it synchronously and explicitly
     from_buffer->InvalidateCache(from_offset, size);
     from_buffer->MemCopyToHost(static_cast<char*>(to) + to_offset,
                                static_cast<const char*>(from) + from_offset, size);
@@ -1434,4 +1428,5 @@ int VTADepPop(VTACommandHandle cmd, int from_qid, int to_qid) {
 }
 
 void VTASynchronize(VTACommandHandle cmd, uint32_t wait_cycles) {
-  static_cast<vta::CommandQueue*>(cmd)->Synchronize(wait_cycles); }
+  static_cast<vta::CommandQueue*>(cmd)->Synchronize(wait_cycles);
+}

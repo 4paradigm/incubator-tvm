@@ -27,9 +27,6 @@ endif()
 
 message(STATUS "VTA build with VTA_HW_PATH=" ${VTA_HW_PATH})
 
-# enable picojson int type support
-add_definitions(-DPICOJSON_USE_INT64)
-
 if(MSVC)
   message(STATUS "VTA build is skipped in Windows..")
 elseif(PYTHON)
