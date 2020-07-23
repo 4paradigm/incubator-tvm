@@ -19,7 +19,6 @@ import atexit
 import contextlib
 import datetime
 import os
-import sys
 import tempfile
 import threading
 import shutil

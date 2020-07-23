@@ -296,7 +296,7 @@ def coproc_sync(op):
     return tvm.tir.call_extern(
         "int32", "VTASynchronize",
         get_env().dev.command_handle,
-        tvm.runtime.const(1<<31, dtype="uint32"), True)
+        tvm.runtime.const(1<<31, dtype="uint32"))
 
 
 

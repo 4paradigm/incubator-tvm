@@ -309,15 +309,6 @@ class StorageAllocator : public StorageAllocaBaseVisitor {
     if (match_range_ == 0) {
       return this->Alloc(prototype, size);
     }
-
-    // TODO(zhanghao): find a better way to do this
-    // We copy all the instructions of all layers in a single batch.
-    // To avoid overwrite shared storage, we do not re-use allocation
-    const char* sync_once = std::getenv("VTA_SYNC_ONCE_EXPERIMENTAL");
-    if (sync_once) {
-      return this->Alloc(prototype, size);
-    }
-
     auto begin = free_.lower_bound(size / match_range_);
     auto mid = free_.lower_bound(size);
     auto end = free_.upper_bound(size * match_range_);

@@ -41,7 +41,6 @@ extern "C" {
 #define VTA_DEBUG_SKIP_READ_BARRIER (1 << 3)
 #define VTA_DEBUG_SKIP_WRITE_BARRIER (1 << 4)
 #define VTA_DEBUG_FORCE_SERIAL (1 << 5)
-#define VTA_DEBUG_LOG_INSN (1 << 6)
 
 /*!
  * \brief Allocate data buffer.
@@ -252,7 +251,7 @@ TVM_DLL int VTADepPop(VTACommandHandle cmd, int from_qid, int to_qid);
  * \param wait_cycles The limit of poll cycles.
  *
  */
-TVM_DLL void VTASynchronize(VTACommandHandle cmd, uint32_t wait_cycles, bool skip=true);
+TVM_DLL void VTASynchronize(VTACommandHandle cmd, uint32_t wait_cycles);
 
 #ifdef __cplusplus
 }

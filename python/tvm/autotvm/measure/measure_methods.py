@@ -32,9 +32,6 @@ from collections import namedtuple
 import tempfile
 
 import numpy as np
-import json
-import sys
-from importlib import import_module
 
 import tvm._ffi
 import tvm.ir.transform
@@ -195,16 +192,6 @@ class RPCRunner(Runner):
                  timeout=10, n_parallel=None,
                  number=4, repeat=3, min_repeat_ms=0, cooldown_interval=0.1,
                  check_correctness=False, enable_cpu_cache_flush=False):
-        static_tune = os.getenv("TVM_STATIC_TUNE_EXPERIMENTAL")
-        if static_tune:
-            if n_parallel is None or n_parallel > 1:
-                print("static tune only allows n_parallel == 1")
-                n_parallel = 1
-
-            if check_correctness == True:
-                print("static tune does not support check_correctness")
-                check_correctness = False
-
         super(RPCRunner, self).__init__(timeout, n_parallel)
 
         self.key = key
@@ -396,15 +383,7 @@ def _build_func_common(measure_input, check_gpu=None, cuda_arch=None, build_opti
             measure_input.target.device_name == 'vta':
             # pylint: disable=import-outside-toplevel
             import vta
-
-            static_tune = os.getenv("TVM_STATIC_TUNE_EXPERIMENTAL")
-            if static_tune:
-                debug_flag = 1 << 6
-            else:
-                debug_flag = 0
-
-            with vta.build_config(debug_flag=debug_flag):
-                func = vta.build(s, args, target_host=task.target_host)
+            func = vta.build(s, args, target_host=task.target_host)
         else:
             with tvm.ir.transform.PassContext(config=opts):
                 func = build(s, args, target_host=task.target_host)
@@ -504,10 +483,16 @@ def run_through_rpc(measure_input, build_result,
 
     tic = time.time()
     errno = MeasureErrorNo.NO_ERROR
-    static_tune = os.getenv("TVM_STATIC_TUNE_EXPERIMENTAL")
     try:
         # upload built module
         remote = request_remote(*remote_args)
+        # Program the FPGA every single time when targeting VTA
+        if hasattr(measure_input.target, 'device_name') and \
+            measure_input.target.device_name == 'vta':
+            # pylint: disable=import-outside-toplevel
+            from vta import program_fpga, reconfig_runtime
+            program_fpga(remote, None)
+            reconfig_runtime(remote)
         remote.upload(build_result.filename)
         func = remote.load_module(os.path.split(build_result.filename)[1])
         ctx = remote.context(str(measure_input.target), 0)
@@ -532,31 +517,12 @@ def run_through_rpc(measure_input, build_result,
             args = [nd.array(x, ctx=ctx) for x in args]
             ctx.sync()
 
-        if static_tune is None:
-            time_f = func.time_evaluator(
-                func.entry_name, ctx, number=number, repeat=repeat, min_repeat_ms=min_repeat_ms)
-            costs = time_f(*args).results
+        costs = time_f(*args).results
 
-            # clean up remote files
-            remote.remove(build_result.filename)
-            remote.remove(os.path.splitext(build_result.filename)[0] + '.so')
-            remote.remove('')
-        else:
-            func(*args)
-            cost = 0
-            insn_dump = os.getenv('TVM_INSN_DUMP_FILE', "insn.json")
-            insn_cost_file = os.getenv('TVM_INSN_COST_FILE', "cost.py")
-            path, filename = os.path.split(insn_cost_file)
-            sys.path.append(path)
-            module_path = filename[:-3]  # remove the .py suffix
-            module = import_module(module_path)
-            cal_cost = getattr(module, "cal_cost")
-            with open(insn_dump) as json_file:
-                insns = json.load(json_file)
-                for insn in insns:
-                    cost += cal_cost(insn)
-
-            costs = [cost] * repeat
+        # clean up remote files
+        remote.remove(build_result.filename)
+        remote.remove(os.path.splitext(build_result.filename)[0] + '.so')
+        remote.remove('')
 
         if len(costs) > 2:  # remove largest and smallest value to reduce variance
             costs = list(costs)
@@ -577,10 +543,6 @@ def run_through_rpc(measure_input, build_result,
             msg = msg[:msg.index("CUDA Source")]
         costs = (RuntimeError(msg[:1024]),)
         errno = MeasureErrorNo.RUNTIME_DEVICE
-    except Exception as exc:
-        costs = (exc,)
-        errno = MeasureErrorNo.UNKNOWN_ERROR
-
     tstamp = time.time()
     time.sleep(cooldown_interval)
     return MeasureResult(costs, errno, tstamp - tic + build_result.time_cost, tstamp)
@@ -608,10 +570,6 @@ def request_remote(device_key, host=None, port=None, priority=1, timeout=60):
     ------
     session: RPCSession
     """
-    static_tune = os.getenv("TVM_STATIC_TUNE_EXPERIMENTAL")
-    if static_tune:
-        return _rpc.LocalSession()
-
     # connect to the tracker
     host = host or os.environ['TVM_TRACKER_HOST']
     port = port or int(os.environ['TVM_TRACKER_PORT'])

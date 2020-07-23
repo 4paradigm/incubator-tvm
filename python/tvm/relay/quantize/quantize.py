@@ -209,18 +209,10 @@ class QuantizeContext(object):
             # check skip conv layers
             skipped_indices = [int(x) for x in current_qconfig().skip_conv_layers]
             if self._conv2d_counter in skipped_indices:
-                if ref_call.op.name == 'nn.conv2d' or ref_call.op.name == 'nn.conv2d_transpose':
+                if ref_call.op.name == 'nn.conv2d':
                     self._conv2d_counter += 1
-                    return True
-                else:
-                    # counter is 0 before visiting the first conv2d
-                    # if the first conv2d is skipped, all ops before it will also be skipped
-                    # otherwise, we don't skip until the counter become +1
-                    if self._conv2d_counter == 0:
-                        return True
-                    else:
-                        return False
-            if ref_call.op.name == 'nn.conv2d' or ref_call.op.name == 'nn.conv2d_transpose':
+                return True
+            if ref_call.op.name == 'nn.conv2d':
                 self._conv2d_counter += 1
 
         return False
