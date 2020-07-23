@@ -42,7 +42,7 @@ import copy
 # Compile network
 # ---------------
 # Perform vta-specific compilation with Relay from a Gluon model
-def compile_network(env, target, model, start_pack, stop_pack, device_annot=False):
+def compile_network(env, target, model, start_pack, stop_pack):
 
     # Populate the shape and data type dictionary
     dtype_dict = {"data": 'float32'}
@@ -70,8 +70,7 @@ def compile_network(env, target, model, start_pack, stop_pack, device_annot=Fals
                                 env.BLOCK_OUT,
                                 env.WGT_WIDTH,
                                 start_name=start_pack,
-                                stop_name=stop_pack,
-                                device_annot=device_annot)
+                                stop_name=stop_pack)
 
     return relay_prog, params
 

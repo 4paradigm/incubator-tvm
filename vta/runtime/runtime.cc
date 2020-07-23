@@ -526,6 +526,7 @@ class UopQueue : public BaseQueue<VTAUop> {
       kernel->sram_begin_ = 0;
       kernel->sram_end_ = 0;
     }
+
     cache_.clear();
     cache_idx_ = 0;
     BaseQueue<VTAUop>::Reset();

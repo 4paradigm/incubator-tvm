@@ -87,19 +87,6 @@ class BuiltinLower : public StmtExprMutator {
     op = stmt.as<AllocateNode>();
     // Get constant allocation bound.
     int64_t nbytes = GetVectorBytes(op->dtype);
-    // NOTE(zhanghao): remove special handling for kDLCPU
-    // otherwise, may cause LLVM parameters match error
-    // if in heterogenous targets
-    // if (device_type_.defined()) {
-    //   if (arith::GetConst(device_type_, &dev_type)) {
-    //     if (dev_type == kDLCPU) {
-    //       int32_t constant_size = op->constant_allocation_size();
-    //       if (constant_size > 0 && constant_size * nbytes < runtime::kMaxStackAlloca) {
-    //         return stmt;
-    //       }
-    //     }
-    //   }
-    // }
     PrimExpr total_bytes = make_const(op->extents[0].dtype(), nbytes);
     for (size_t i = 0; i < op->extents.size(); ++i) {
       total_bytes = total_bytes * op->extents[i];
