@@ -193,7 +193,7 @@ def multiply_strategy_vta(attrs, inputs, out_type, target):
 
 env = get_env()
 # other target does not support alu-only ops
-if env.TARGET in ["sim", "tsim", "intelfocl"]:
+if env.TARGET in ["sim", "intelfocl"]:
     reg.get("add").get_attr("FTVMStrategy").register(add_strategy_vta, "vta")
     reg.get("multiply").get_attr("FTVMStrategy").register(multiply_strategy_vta, "vta")
 

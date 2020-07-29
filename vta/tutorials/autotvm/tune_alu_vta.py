@@ -259,18 +259,9 @@ def register_vta_tuning_tasks():
 # Finally, we launch tuning jobs and evaluate the end-to-end performance.
 def tune_and_evaluate(tuning_opt):
 
-    if env.TARGET != "sim":
-        # Get remote from fleet node
-        remote = autotvm.measure.request_remote(env.TARGET,
-                                                tracker_host,
-                                                tracker_port,
-                                                timeout=10000)
-        # Reconfigure the JIT runtime and FPGA.
-        vta.reconfig_runtime(remote)
-        vta.program_fpga(remote, bitstream=None)
-    else:
-        # In simulation mode, host the RPC server locally.
-        remote = rpc.LocalSession()
+    if env.TARGET != "intelfocl":
+        print("ALU only op only available for intelfocl target")
+        return
 
     # Register VTA tuning tasks
     register_vta_tuning_tasks()
