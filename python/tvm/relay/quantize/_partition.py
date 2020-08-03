@@ -81,7 +81,7 @@ def add_partition_generic(ref_call, new_args, ctx):
         #     ...
         lhs = new_args[0].realize()
         rhs = new_args[1].realize()
-        return QPartitionExpr(_forward_op(ref_call, [lhs, rhs]))
+        return _forward_op(ref_call, [lhs, rhs])
     if not lhs_cond and rhs_cond:
         # - introduced by residual connection in ResNet
         #     ...
@@ -128,7 +128,6 @@ def mul_partition_generic(ref_call, new_args, ctx):
 
     if lhs_cond:
         # introduced by bn: multiply(out, scale)
-        lhs = new_args[0].realize()
         return QPartitionExpr(_forward_op(ref_call, [lhs, rhs]))
 
     if not lhs_cond and not rhs_cond:
@@ -154,16 +153,3 @@ def add_partition_function(ref_call, new_args, ctx):
 def multiply_partition_function(ref_call, new_args, ctx):
     """Rewrite function for ewise multiply for partition"""
     return mul_partition_generic(ref_call, new_args, ctx)
-
-
-# add cast after the relu op to make it run on vta
-@register_partition_function("nn.global_avg_pool2d")
-def global_avg_pool2d_partition_function(ref_call, new_args, ctx):
-    cond, expr = partition_expr_check(new_args[0])
-    if cond:
-        expr = new_args[0].realize()
-        return _forward_op(ref_call, [expr])
-    else:
-        expr = QPartitionExpr(new_args[0]).realize()
-        return _forward_op(ref_call, [expr])
-    return None
