@@ -53,52 +53,51 @@ static const bool kBufferCoherent = VTA_COHERENT_ACCESSES;
 /*! \brief Always cache buffers (otherwise, write back to DRAM from CPU) */
 static const bool kAlwaysCache = true;
 
-template <typename T, std::size_t N = 64>
-class AlignmentAllocator {
-public:
+template <typename T, std::size_t N = ALLOC_ALIGNMENT>
+class AlignmentAllocator : public std::allocator<T> {
+ public:
   typedef T value_type;
   typedef std::size_t size_type;
   typedef std::ptrdiff_t difference_type;
 
-  typedef T * pointer;
-  typedef const T * const_pointer;
+  typedef T* pointer;
+  typedef const T* const_pointer;
 
-  typedef T & reference;
-  typedef const T & const_reference;
+  typedef T& reference;
+  typedef const T& const_reference;
 
-  public:
-  inline AlignmentAllocator () throw () { }
+  inline AlignmentAllocator() throw() {}
 
   template <typename T2>
-  inline AlignmentAllocator (const AlignmentAllocator<T2, N> &) throw () { }
+  inline AlignmentAllocator(const AlignmentAllocator<T2, N>&) throw() {}
 
-  inline ~AlignmentAllocator () throw () { }
+  inline ~AlignmentAllocator() throw() {}
 
-  inline pointer adress (reference r) {
+  inline pointer address(reference r) {
     return &r;
   }
 
-  inline const_pointer adress (const_reference r) const {
+  inline const_pointer address(const_reference r) const {
     return &r;
   }
 
-  inline pointer allocate (size_type n) {
-     return (pointer)memalign(N, n*sizeof(value_type));
+  inline pointer allocate(size_type n) {
+     return (pointer)memalign(N, n * sizeof(value_type));
   }
 
-  inline void deallocate (pointer p, size_type) {
+  inline void deallocate(pointer p, size_type) {
     free(p);
   }
 
-  inline void construct (pointer p, const value_type & wert) {
-     new (p) value_type (wert);
+  inline void construct(pointer p, const value_type& wert) {
+     new (p) value_type(wert);
   }
 
-  inline void destroy (pointer p) {
-    p->~value_type ();
+  inline void destroy(pointer p) {
+    p->~value_type();
   }
 
-  inline size_type max_size () const throw () {
+  inline size_type max_size() const throw() {
     return size_type (-1) / sizeof (value_type);
   }
 
@@ -442,7 +441,7 @@ class BaseQueue {
   // End location of current SRAM write in FIFO mode
   uint32_t sram_end_{0};
   // The buffer in DRAM
-  std::vector<T, AlignmentAllocator<T, 64>> dram_buffer_;
+  std::vector<T, AlignmentAllocator<T, ALLOC_ALIGNMENT>> dram_buffer_;
   // FPGA accessible buffer
   void* fpga_buff_{NULL};
   // Physical address of the FPGA buffer
@@ -550,7 +549,7 @@ class UopQueue : public BaseQueue<VTAUop> {
       total_size += ksize;
     }
 
-    char *lbuf = (char*)memalign(64, total_size);
+    char *lbuf = (char*)memalign(ALLOC_ALIGNMENT, total_size);
     uint32_t offset = 0;
     for (uint32_t i = 0; i < cache_.size(); ++i) {
       uint32_t ksize = cache_[i]->size() * kElemBytes;
