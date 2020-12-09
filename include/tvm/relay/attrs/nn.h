@@ -29,6 +29,8 @@
 
 #include <string>
 
+#include "tvm/runtime/container.h"
+
 namespace tvm {
 namespace relay {
 
@@ -115,9 +117,10 @@ struct Conv2DAttrs : public tvm::AttrsNode<Conv2DAttrs> {
   int groups;
   IndexExpr channels;
   Array<IndexExpr> kernel_size;
-  std::string data_layout;
-  std::string kernel_layout;
-  std::string out_layout;
+  tvm::String data_layout;
+  tvm::String kernel_layout;
+  tvm::String out_layout;
+  std::string auto_scheduler_rewritten_layout;
   DataType out_dtype;
 
   TVM_DECLARE_ATTRS(Conv2DAttrs, "relay.attrs.Conv2DAttrs") {
@@ -596,11 +599,13 @@ struct Conv2DTransposeAttrs : public tvm::AttrsNode<Conv2DTransposeAttrs> {
 /*! \brief Attributes used in dilate operator */
 struct DilateAttrs : public tvm::AttrsNode<DilateAttrs> {
   Array<IndexExpr> strides;
+  double dilation_value;
 
   TVM_DECLARE_ATTRS(DilateAttrs, "relay.attrs.DilateAttrs") {
     TVM_ATTR_FIELD(strides)
         .set_default(Array<IndexExpr>({1, 1}))
         .describe("Dilation stride on each dimension, 1 means no dilation.");
+    TVM_ATTR_FIELD(dilation_value).set_default(0.0).describe("Value used to dilate the input.");
   }
 };
 
@@ -679,7 +684,7 @@ struct MaxPool2DAttrs : public tvm::AttrsNode<MaxPool2DAttrs> {
   Array<IndexExpr> pool_size;
   Array<IndexExpr> strides;
   Array<IndexExpr> padding;
-  std::string layout;
+  tvm::String layout;
   bool ceil_mode;
 
   TVM_DECLARE_ATTRS(MaxPool2DAttrs, "relay.attrs.MaxPool2DAttrs") {
@@ -742,7 +747,7 @@ struct AvgPool2DAttrs : public tvm::AttrsNode<AvgPool2DAttrs> {
 
 /*! \brief Attributes for global pool operator */
 struct GlobalPool2DAttrs : public tvm::AttrsNode<GlobalPool2DAttrs> {
-  std::string layout;
+  tvm::String layout;
 
   TVM_DECLARE_ATTRS(GlobalPool2DAttrs, "relay.attrs.GlobalPool2DAttrs") {
     TVM_ATTR_FIELD(layout).set_default("NCHW").describe(
@@ -1319,6 +1324,34 @@ struct CorrelationAttrs : public tvm::AttrsNode<CorrelationAttrs> {
         "dimensions respectively.");
   }
 };  // struct CorrelationAttrs
+
+/*! \brief Attributes used in SpaceToBatchND operator */
+struct SpaceToBatchNDAttrs : public tvm::AttrsNode<SpaceToBatchNDAttrs> {
+  Array<Integer> block_shape;
+  Array<Array<IndexExpr>> paddings;
+  double pad_value;
+
+  TVM_DECLARE_ATTRS(SpaceToBatchNDAttrs, "relay.attrs.SpaceToBatchNDAttrs") {
+    TVM_ATTR_FIELD(block_shape)
+        .set_default(Array<Integer>({1, 1}))
+        .describe("1-D containing block size for each spatial dimension.");
+    TVM_ATTR_FIELD(paddings).describe("2-D containing paddings for each spatial dimension.");
+    TVM_ATTR_FIELD(pad_value).set_default(0.0).describe("The value used for padding.");
+  }
+};  // struct SpaceToBatchNDAttrs
+
+/*! \brief Attributes used in BatchToSpaceND operator */
+struct BatchToSpaceNDAttrs : public tvm::AttrsNode<BatchToSpaceNDAttrs> {
+  Array<Integer> block_shape;
+  Array<Array<IndexExpr>> crops;
+
+  TVM_DECLARE_ATTRS(BatchToSpaceNDAttrs, "relay.attrs.BatchToSpaceNDAttrs") {
+    TVM_ATTR_FIELD(block_shape)
+        .set_default(Array<Integer>({1, 1}))
+        .describe("1-D containing block size for each spatial dimension.");
+    TVM_ATTR_FIELD(crops).describe("2-D containing amount to crop from spatial dimension.");
+  }
+};  // struct BatchToSpaceNDAttrs
 
 }  // namespace relay
 }  // namespace tvm

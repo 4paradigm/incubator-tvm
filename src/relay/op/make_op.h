@@ -52,6 +52,8 @@ Expr MakeFull(Expr fill_value, Array<Integer> shape, DataType dtype);
 
 Expr MakeLayoutTransform(Expr data, String src_layout, String dst_layout);
 
+Expr MakeAutoSchedulerLayoutTransform(Expr data, String src_layout, String dst_layout);
+
 Expr MakeOnes(Array<Integer> shape, DataType dtype);
 
 Expr MakePad(Expr data, Array<Array<Integer>> pad_width, double pad_value, String pad_mode);
@@ -62,13 +64,17 @@ Expr MakeRepeat(Expr data, int repeats, int axis);
 
 Expr MakeReshape(Expr data, Array<Integer> newshape);
 
+Expr MakeReshapeLike(Expr lhs, Expr rhs, int lhs_begin, Integer lhs_end, int rhs_begin,
+                     Integer rhs_end);
+
 Expr MakeSplit(Expr data, ObjectRef indices_or_sections, int axis);
 
 Expr MakeSqueeze(Expr data, Array<Integer> axis);
 
 Expr MakeStack(Expr data, int axis);
 
-Expr MakeStridedSlice(Expr data, Expr begin, Expr end, Expr strides, String slice_mode);
+Expr MakeStridedSlice(Expr data, Array<Integer> begin, Array<Integer> end, Array<Integer> strides,
+                      String slice_mode);
 
 Expr MakeTile(Expr data, Array<Integer> reps);
 
@@ -76,6 +82,9 @@ Expr MakeTopK(Expr data, int k, int axis, String ret_type, bool is_ascend, DataT
 
 Expr MakeUpSampling(Expr data, double scale_h, double scale_w, String layout, String method,
                     bool align_corners);
+
+Expr MakeUpSampling3D(Expr data, double scale_d, double scale_h, double scale_w, String layout,
+                      String method, String coordinate_transformation_mode);
 
 Expr MakeVariance(Expr data, Expr mean, Array<Integer> axis, bool keepdims, bool exclude,
                   bool unbiased);
@@ -86,6 +95,8 @@ Expr MakeOneHot(Expr indices, Expr on_value, Expr off_value, int depth, int axis
 
 Expr MakeResize(Expr data, Array<IndexExpr> size, String layout, String method,
                 String coordinate_transformation_mode, DataType out_dtype);
+
+Expr MakeSparseToDense(Expr indices, Array<Integer> output_shape, Expr values, Expr default_value);
 
 }  // namespace relay
 }  // namespace tvm

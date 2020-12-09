@@ -101,6 +101,7 @@ macro_rules! TVMPODValue {
                         TVMArgTypeCode_kTVMOpaqueHandle => Handle($value.v_handle),
                         TVMArgTypeCode_kTVMDLTensorHandle => ArrayHandle($value.v_handle as TVMArrayHandle),
                         TVMArgTypeCode_kTVMObjectHandle => ObjectHandle($value.v_handle),
+                        TVMArgTypeCode_kTVMObjectRValueRefArg => ObjectHandle(*($value.v_handle as *mut *mut c_void)),
                         TVMArgTypeCode_kTVMModuleHandle => ModuleHandle($value.v_handle),
                         TVMArgTypeCode_kTVMPackedFuncHandle => FuncHandle($value.v_handle),
                         TVMArgTypeCode_kTVMNDArrayHandle => NDArrayHandle($value.v_handle),
@@ -376,5 +377,51 @@ impl TryFrom<RetValue> for std::ffi::CString {
     fn try_from(val: RetValue) -> Result<CString, Self::Error> {
         try_downcast!(val -> std::ffi::CString,
             |RetValue::Str(val)| { val.into() })
+    }
+}
+
+// Implementations for bool.
+
+impl<'a> From<bool> for ArgValue<'a> {
+    fn from(s: bool) -> Self {
+        (s as i64).into()
+    }
+}
+
+impl From<bool> for RetValue {
+    fn from(s: bool) -> Self {
+        (s as i64).into()
+    }
+}
+
+impl TryFrom<RetValue> for bool {
+    type Error = ValueDowncastError;
+
+    fn try_from(val: RetValue) -> Result<bool, Self::Error> {
+        try_downcast!(val -> bool,
+            |RetValue::Int(val)| { !(val == 0) })
+    }
+}
+
+impl<'a> TryFrom<ArgValue<'a>> for bool {
+    type Error = ValueDowncastError;
+
+    fn try_from(val: ArgValue<'a>) -> Result<bool, Self::Error> {
+        try_downcast!(val -> bool, |ArgValue::Int(val)| { !(val == 0) })
+    }
+}
+
+impl From<()> for RetValue {
+    fn from(_: ()) -> Self {
+        RetValue::Null
+    }
+}
+
+impl TryFrom<RetValue> for () {
+    type Error = ValueDowncastError;
+
+    fn try_from(val: RetValue) -> Result<(), Self::Error> {
+        try_downcast!(val -> bool,
+            |RetValue::Null| { () })
     }
 }

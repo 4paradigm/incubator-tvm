@@ -20,9 +20,15 @@ import numpy as np
 
 import tvm
 from tvm import relay
+from tvm import testing
 
-from .infrastructure import skip_runtime_test, skip_codegen_test, build_and_run, \
-    verify, verify_codegen
+from .infrastructure import (
+    skip_runtime_test,
+    skip_codegen_test,
+    build_and_run,
+    verify,
+    verify_codegen,
+)
 from .infrastructure import Device
 
 
@@ -44,14 +50,15 @@ def _get_expected_codegen(input_shape, output_shape, dtype):
             "newshape": [[str(s) for s in output_shape]],
             "shape": [[list(output_shape)]],
             "dtype": [[dtype]],
-            "reverse": [["0"]]
+            "reverse": [["0"]],
         },
     }
 
     input = {
         "op": "input",
         "name": "",
-        "attrs": {"shape": [[list(input_shape)]], "dtype": [[dtype]]}}
+        "attrs": {"shape": [[list(input_shape)]], "dtype": [[dtype]]},
+    }
 
     return [input, node]
 
@@ -65,18 +72,17 @@ def test_reshape():
     device = Device()
     np.random.seed(0)
 
-    for dtype, low, high, atol, rtol in [("float32", -127, 128, 0.001, 0.001), ("uint8", 0, 255, 0, 0)]:
-        inputs = {
-            "a": tvm.nd.array(
-                np.random.uniform(low, high, (1, 1, 1, 1000)).astype(dtype))
-        }
+    for dtype, low, high, atol, rtol in [
+        ("float32", -127, 128, 0.001, 0.001),
+        ("uint8", 0, 255, 0, 0),
+    ]:
+        inputs = {"a": tvm.nd.array(np.random.uniform(low, high, (1, 1, 1, 1000)).astype(dtype))}
 
-        for new_shape in [(1, 1000), (10, 10, 10)]:
+        for new_shape in [(1, 1000), (10, 10, 10), (10, 100, 1), (1, 1000, 1)]:
             outputs = []
             func = _get_model(inputs["a"].shape, new_shape, dtype, iter(inputs))
             for acl in [False, True]:
-                outputs.append(build_and_run(func, inputs, 1, None, device,
-                                             enable_acl=acl)[0])
+                outputs.append(build_and_run(func, inputs, 1, None, device, enable_acl=acl)[0])
 
             config = {
                 "new shape": inputs["a"].shape,
@@ -93,7 +99,7 @@ def test_codegen_reshape():
     shape = (1, 1, 1, 1000)
     inputs = {"a"}
     for dtype in ["float32", "uint8"]:
-        for new_shape in [(1, 1000), (10, 10, 10)]:
+        for new_shape in [(1, 1000), (10, 10, 10), (10, 100, 1)]:
             args = (shape, new_shape, dtype)
             func = _get_model(*args, iter(inputs))
             exp_codegen = _get_expected_codegen(*args)

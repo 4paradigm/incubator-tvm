@@ -125,6 +125,9 @@ class Layout : public ObjectRef {
   explicit Layout(const Array<tir::IterVar>& axes);
 
   /*! \brief construct from a string */
+  Layout(const tvm::String& name) : Layout(name.operator std::string()) {}  // NOLINT(*)
+
+  /*! \brief construct from a string */
   Layout(const char* name) : Layout(std::string(name)) {}  // NOLINT(*)
 
   /*!
@@ -252,9 +255,9 @@ class Layout : public ObjectRef {
   }
 
   const LayoutAxis& operator[](int32_t i) const {
-    CHECK(defined()) << "Try to access axis from an undefined layout.";
+    ICHECK(defined()) << "Try to access axis from an undefined layout.";
     int32_t index = i < 0 ? static_cast<int32_t>(ndim() + i) : i;
-    CHECK(index >= 0 && static_cast<size_t>(index) < ndim()) << "Invalid index " << i;
+    ICHECK(index >= 0 && static_cast<size_t>(index) < ndim()) << "Invalid index " << i;
     const tir::IterVar axis = operator->()->axes[index];
     return LayoutAxis::Get(axis);
   }
@@ -312,10 +315,11 @@ class BijectiveLayoutNode : public Object {
   TVM_DECLARE_FINAL_OBJECT_INFO(BijectiveLayoutNode, Object);
 };
 
-/*! \brief Bijective function mapping for data layout transformation.
+/*!
+ * \brief Bijective function mapping for data layout transformation.
  *   Given two Layout, BijectiveLayout build and store the mapping rules,
- *   provides API to transform N-dimention tensor from the source indices (i0, i1, …, im)
- *   to the destination indices (j0, j1, … jm).
+ *   provides API to transform N-dimention tensor from the source indices (i0, i1, .., im)
+ *   to the destination indices (j0, j1, .., jm).
  */
 class BijectiveLayout : public ObjectRef {
  public:

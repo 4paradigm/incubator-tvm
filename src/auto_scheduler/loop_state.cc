@@ -42,13 +42,16 @@ TVM_REGISTER_NODE_TYPE(StateNode);
 TVM_REGISTER_NODE_TYPE(IteratorNode);
 
 /********** Iterator **********/
-Iterator::Iterator(String name, Range range, IteratorKind iter_kind,
-                   IteratorAnnotation annotation) {
+Iterator::Iterator(String name, Range range, IteratorKind iter_kind, IteratorAnnotation annotation,
+                   const std::vector<Iterator>* orig_iters) {
   auto node = make_object<IteratorNode>();
   node->name = std::move(name);
   node->range = std::move(range);
   node->iter_kind = iter_kind;
   node->annotation = annotation;
+  if (orig_iters != nullptr) {
+    node->orig_iters = *orig_iters;
+  }
   data_ = std::move(node);
 }
 
@@ -111,7 +114,7 @@ void AttachMap::DeleteStage(int stage_id) {
 
 void AttachMap::UpdateIters(const std::vector<IterKey>& original_iters,
                             const std::vector<IterKey>& new_iters) {
-  CHECK_EQ(original_iters.size(), new_iters.size());
+  ICHECK_EQ(original_iters.size(), new_iters.size());
   AttachMapNode* pnode = CopyOnWrite();
   std::unordered_map<IterKey, std::vector<StageKey>> new_iter_to_attached_stages;
   for (size_t i = 0; i < original_iters.size(); ++i) {
@@ -145,7 +148,7 @@ void AttachMap::DeleteStageEntry(AttachMapNode* pnode, int stage_id) {
   // We get <StageKey, IterKey> from this map
   if (old_entry != pnode->stage_to_attach_iter.end()) {
     // Delete the stage in `iter_to_attached_stages`, if the corresponding iterator does not have
-    // any attatched stage, delete this iterm too
+    // any attached stage, delete this iterm too
     auto entry2 = pnode->iter_to_attached_stages.find(old_entry->second);
     // We get <IterKey, std::vector<StageKey>> from this map
     FindAndDeleteItem(&entry2->second, stage_id);
@@ -262,8 +265,8 @@ void State::pragma(int stage_id, const Iterator& it, const String& pragma_type) 
 
 void State::reorder(int stage_id, const Array<Iterator>& order) {
   const Stage& stage = operator->()->stages[stage_id];
-  CHECK_EQ(order.size(), stage->iters.size()) << "The order of all iterators "
-                                              << "should be specified";
+  ICHECK_EQ(order.size(), stage->iters.size()) << "The order of all iterators "
+                                               << "should be specified";
   Array<Integer> after_ids;
   GetIndices(stage->iters, order, &after_ids);
   ReorderStep step = ReorderStep(stage_id, after_ids);
@@ -441,6 +444,12 @@ String State::ToStr(bool delete_trivial_loop) const {
   PrintState(&os, (*this), delete_trivial_loop);
   return os.str();
 }
+
+TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
+    .set_dispatch<StageNode>([](const ObjectRef& ref, ReprPrinter* p) {
+      const auto& stage = tvm::Downcast<Stage>(ref);
+      p->stream << stage->GetTypeKey() << "(" << stage.get() << ": " << stage->op->name << ")";
+    });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<StateNode>([](const ObjectRef& ref, ReprPrinter* p) {

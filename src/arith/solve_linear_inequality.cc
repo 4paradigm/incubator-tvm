@@ -268,7 +268,7 @@ PartialSolvedInequalities SolveLinearInequalities(const IntConstraints& system_t
 
   Map<Var, IntGroupBounds> res_bounds;
   for (const Var& v : system_to_solve->variables) {
-    CHECK(!res_bounds.count(v))
+    ICHECK(!res_bounds.count(v))
         << "Variable " << v
         << " appears more than one time in the `variables` which might be a bug";
 
@@ -407,6 +407,9 @@ PartialSolvedInequalities SolveLinearInequalities(const IntConstraints& system_t
   return {res_bounds, other_conditions};
 }
 
+#ifdef _MSC_VER
+#pragma optimize("g", off)
+#endif
 IntConstraints SolveInequalitiesToRange(const IntConstraints& inequalities) {
   // Resulting ranges will contain ranges for the new variables and for the variables that are
   // not in the inequalities->variables but are in inequalities->ranges
@@ -433,12 +436,14 @@ IntConstraints SolveInequalitiesToRange(const IntConstraints& inequalities) {
     analyzer.Bind(vranges);
 
     const Var& var = *it;
-    CHECK(solved_bounds.count(var));
+    ICHECK(solved_bounds.count(var));
     auto bnd = solved_bounds[var];
     if (is_one(bnd->coef) && !bnd->equal.empty()) {
       // There is an equation of the form `v == expr`, so this variable can be completely removed.
       // Note that we use the 0-th expression because they are ordered by complexity,
       // so it must be the simplest one.
+      // The MSVC compiler optimization must be disabled for the expression `bnd->equal[0]` which
+      // triggers an internal compiler error.
       Range best_range(bnd->equal[0],
                        analyzer.Simplify(bnd->equal[0] + 1, kSimplifyRewriteCanonicalRewrite));
       res_ranges.Set(var, best_range);
@@ -477,6 +482,9 @@ IntConstraints SolveInequalitiesToRange(const IntConstraints& inequalities) {
 
   return system;
 }
+#ifdef _MSC_VER
+#pragma optimize("g", on)
+#endif
 
 IntConstraintsTransform SolveInequalitiesDeskewRange(const IntConstraints& inequalities) {
   // Resulting ranges will contain ranges for the new variables and for the variables that are

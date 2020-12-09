@@ -83,17 +83,21 @@ class FIFOBufferAttrs(Attrs):
 class UpSamplingAttrs(Attrs):
     """Attributes for nn.upsampling"""
 
+
 @tvm._ffi.register_object("relay.attrs.UpSampling3DAttrs")
 class UpSampling3DAttrs(Attrs):
     """Attributes for nn.upsampling3d"""
+
 
 @tvm._ffi.register_object("relay.attrs.PadAttrs")
 class PadAttrs(Attrs):
     """Attributes for nn.pad"""
 
+
 @tvm._ffi.register_object("relay.attrs.MirrorPadAttrs")
 class MirrorPadAttrs(Attrs):
     """Attributes for nn.mirror_pad"""
+
 
 @tvm._ffi.register_object("relay.attrs.LeakyReluAttrs")
 class LeakyReluAttrs(Attrs):
@@ -189,9 +193,16 @@ class TransposeAttrs(Attrs):
 class ReshapeAttrs(Attrs):
     """Attributes for transform.reshape"""
 
+
+@tvm._ffi.register_object("relay.attrs.ReshapeLikeAttrs")
+class ReshapeLikeAttrs(Attrs):
+    """Attributes for transform.reshape_like"""
+
+
 @tvm._ffi.register_object("relay.attrs.GatherAttrs")
 class GatherAttrs(Attrs):
     """Attributes for transform.gather"""
+
 
 @tvm._ffi.register_object("relay.attrs.TakeAttrs")
 class TakeAttrs(Attrs):
@@ -231,6 +242,7 @@ class TileAttrs(Attrs):
 @tvm._ffi.register_object("relay.attrs.ReverseAttrs")
 class ReverseAttrs(Attrs):
     """Attributes used in reverse operators"""
+
 
 @tvm._ffi.register_object("relay.attrs.ReverseSequenceAttrs")
 class ReverseSequenceAttrs(Attrs):
@@ -361,9 +373,11 @@ class BinaryDenseAttrs(Attrs):
 class Conv2DTransposeAttrs(Attrs):
     """Attributes used in Transposed Conv2D operators"""
 
+
 @tvm._ffi.register_object("relay.attrs.Conv3DTransposeAttrs")
 class Conv3DTransposeAttrs(Attrs):
     """Attributes used in Transposed Conv3D operators"""
+
 
 @tvm._ffi.register_object("relay.attrs.DilateAttrs")
 class DilateAttrs(Attrs):
@@ -455,6 +469,11 @@ class QuantizeAttrs(Attrs):
     """Attributes used in quantize operators"""
 
 
+@tvm._ffi.register_object("relay.attrs.DequantizeAttrs")
+class DequantizeAttrs(Attrs):
+    """Attributes used in dequantize operators"""
+
+
 @tvm._ffi.register_object("relay.attrs.ReduceAttrs")
 class ReduceAttrs(Attrs):
     """Attributes used in reduction operators (e.g. sum)"""
@@ -523,3 +542,13 @@ class TupleGetItemAttrs(Attrs):
 @tvm._ffi.register_object("relay.attrs.WithFuncIdAttrs")
 class WithFuncIdAttrs(Attrs):
     """Attributes used in with_funcid annotation operators"""
+
+
+@tvm._ffi.register_object("relay.attrs.SpaceToBatchNDAttrs")
+class SpaceToBatchNDAttrs(Attrs):
+    """Attributes used in SpaceToBatchND operators"""
+
+
+@tvm._ffi.register_object("relay.attrs.BatchToSpaceNDAttrs")
+class BatchToSpaceNDAttrs(Attrs):
+    """Attributes used in BatchToSpaceNDAttrs operators"""

@@ -39,7 +39,7 @@ void SearchPolicyNode::PreloadMeasuredStates(const String& log_file) {
   RecordReader reader = RecordReader(log_file);
   const auto& res = reader->ReadLines(-1);
   size_t log_size = res.first.size();
-  CHECK_EQ(log_size, res.second.size());
+  ICHECK_EQ(log_size, res.second.size());
   if (log_size) {
     Array<State> measured_states;
     std::vector<float> measured_throughputs;
@@ -58,6 +58,7 @@ void SearchPolicyNode::PreloadMeasuredStates(const String& log_file) {
             res.second[i]->error_no == 0 ? (1.0 / FloatArrayMean(res.second[i]->costs)) : 0.0);
       }
     }
+    // We can assume the recorded states will all be valid after infer bound
     measured_states = search_task->compute_dag.InferBound(measured_states);
     for (size_t i = 0; i < measured_states.size(); i++) {
       auto& state = measured_states[i];
@@ -103,8 +104,13 @@ TVM_REGISTER_GLOBAL("auto_scheduler.SearchPolicyRunCallbacks")
       }
     });
 
-TVM_REGISTER_GLOBAL("auto_scheduler.SearchPolicySetTask")
-    .set_body_typed([](SearchPolicy policy, SearchTask task) { policy->search_task = task; });
+TVM_REGISTER_GLOBAL("auto_scheduler.SearchPolicyContinueSearchOneRound")
+    .set_body_typed([](SearchPolicy policy, int num_measure, ProgramMeasurer measurer) {
+      Array<MeasureInput> inputs;
+      Array<MeasureResult> results;
+      std::tie(inputs, results) = policy->ContinueSearchOneRound(num_measure, measurer);
+      return Array<ObjectRef>{inputs, results};
+    });
 
 TVM_REGISTER_GLOBAL("auto_scheduler.SearchPolicySetVerbose")
     .set_body_typed([](SearchPolicy policy, int verbose) { policy->verbose = verbose; });

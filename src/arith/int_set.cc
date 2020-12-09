@@ -289,8 +289,8 @@ inline IntervalSet Combine<tir::FloorMod>(Analyzer* analyzer, IntervalSet a, Int
     if (analyzer->CanProveGreaterEqual(divisor, 0)) {
       if (divisor.as<tir::IntImmNode>()) {
         // a mod b = a - (a / b) * b if a_max / b == a_min / b
-        auto qmax = floordiv(a->max_value, divisor);
-        auto qmin = floordiv(a->min_value, divisor);
+        auto qmax = a->HasUpperBound() ? floordiv(a->max_value, divisor) : pos_inf();
+        auto qmin = a->HasLowerBound() ? floordiv(a->min_value, divisor) : neg_inf();
         if (analyzer->CanProve(qmax == qmin)) {
           auto tmax = a->max_value - divisor * qmin;
           auto tmin = a->min_value - divisor * qmin;
@@ -412,7 +412,7 @@ class IntervalSetEvaluator : public ExprFunctor<IntervalSet(const PrimExpr&)> {
   IntervalSet VisitExpr_(const OrNode* op) final { return VisitBinaryExpr_<Or>(op); }
 
   IntervalSet VisitExpr_(const RampNode* op) final {
-    CHECK(eval_vec_);
+    ICHECK(eval_vec_);
     IntervalSet base = Eval(op->base);
     PVar<IntImm> stride;
     if (stride.Match(op->stride)) {
@@ -431,7 +431,7 @@ class IntervalSetEvaluator : public ExprFunctor<IntervalSet(const PrimExpr&)> {
   }
 
   IntervalSet VisitExpr_(const BroadcastNode* op) final {
-    CHECK(eval_vec_);
+    ICHECK(eval_vec_);
     return VisitExpr(op->value);
   }
 
@@ -439,6 +439,15 @@ class IntervalSetEvaluator : public ExprFunctor<IntervalSet(const PrimExpr&)> {
     IntervalSet true_set = this->Eval(op->true_value);
     IntervalSet false_set = this->Eval(op->false_value);
     return Union(analyzer_, false_set, true_set);
+  }
+
+  IntervalSet VisitExpr_(const CastNode* op) final {
+    IntervalSet value_set = this->Eval(op->value);
+    PrimExpr min_value =
+        value_set->HasLowerBound() ? cast(op->dtype, value_set->min_value) : neg_inf();
+    PrimExpr max_value =
+        value_set->HasUpperBound() ? cast(op->dtype, value_set->max_value) : pos_inf();
+    return IntervalSet(min_value, max_value);
   }
 
   IntervalSet VisitExprDefault_(const Object* op) final {
@@ -497,7 +506,7 @@ Range IntSet::CoverRange(Range max_range) const {
   IntSet temp;
   Analyzer analyzer;
   const IntervalSetNode* s_int = (*this).as<IntervalSetNode>();
-  CHECK(s_int != nullptr);
+  ICHECK(s_int != nullptr);
   if (s_int->HasUpperBound() && s_int->HasLowerBound()) {
     return Range::FromMinExtent(s_int->min_value,
                                 analyzer.Simplify(s_int->max_value + 1 - s_int->min_value));
@@ -507,13 +516,13 @@ Range IntSet::CoverRange(Range max_range) const {
 
 PrimExpr IntSet::min() const {
   const IntervalSetNode* s_int = (*this).as<IntervalSetNode>();
-  CHECK(s_int);
+  ICHECK(s_int);
   return s_int->min_value;
 }
 
 PrimExpr IntSet::max() const {
   const IntervalSetNode* s_int = (*this).as<IntervalSetNode>();
-  CHECK(s_int);
+  ICHECK(s_int);
   return s_int->max_value;
 }
 
@@ -575,7 +584,7 @@ SignType IntSet::GetSignType() const {
 }
 PrimExpr IntSet::PointValue() const {
   const IntervalSetNode* s_int = (*this).as<IntervalSetNode>();
-  CHECK(s_int && s_int->IsSinglePoint());
+  ICHECK(s_int && s_int->IsSinglePoint());
   return s_int->min_value;
 }
 
@@ -609,6 +618,7 @@ bool IntSet::MatchRange(const Range& b) const {
   const IntSet& a = *this;
   const IntervalSetNode* a_int = a.as<IntervalSetNode>();
   if (!a_int) return false;
+  if (!a_int->HasUpperBound() || !a_int->HasLowerBound()) return false;
   Analyzer ana;
   return ProveEqual(&ana, a_int->min_value, b->min) &&
          ProveEqual(&ana, a_int->max_value, b->extent + b->min - 1);

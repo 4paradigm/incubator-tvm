@@ -14,7 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#pylint: disable=unused-argument,inconsistent-return-statements
+# pylint: disable=unused-argument,inconsistent-return-statements
 """Internal module for registering attribute for annotation."""
 import warnings
 from tvm import topi
@@ -51,8 +51,7 @@ def simulated_quantize_compute(attrs, inputs, out_type):
 
 
 _reg.register_injective_schedule("relay.op.annotation.simulated_quantize")
-_reg.register_pattern("relay.op.annotation.simulated_quantize",
-                      _reg.OpPattern.ELEMWISE)
+_reg.register_pattern("relay.op.annotation.simulated_quantize", _reg.OpPattern.ELEMWISE)
 _reg.register_injective_schedule("annotation.cast_hint")
 
 
@@ -68,9 +67,9 @@ class QAnnotateExpr(_expr.TempExpr):
     kind: QAnnotateKind
         the kind of annotation field.
     """
+
     def __init__(self, expr, kind):
-        self.__init_handle_by_constructor__(
-            _quantize.make_annotate_expr, expr, kind)
+        self.__init_handle_by_constructor__(_quantize.make_annotate_expr, expr, kind)
 
 
 def _get_expr_kind(anno):
@@ -94,6 +93,7 @@ def register_annotate_function(op_name, frewrite=None, level=10):
     level : int, optional
         The priority level
     """
+
     def default_rewrite(ref_call, new_args, ctx):
         # recover from QAnnotateExpr
         args = [_get_expr_kind(x)[0] for x in new_args]
@@ -101,6 +101,7 @@ def register_annotate_function(op_name, frewrite=None, level=10):
 
     def _register(func):
         """internal register function"""
+
         def frewrite_with_guard(ref_call, new_args, ctx):
             if not current_qconfig().guard(ref_call):
                 return default_rewrite(ref_call, new_args, ctx)
@@ -135,25 +136,48 @@ def attach_simulated_quantize(data, kind, sign=True, rounding="round"):
     dom_scale = _expr.var("dom_scale")
     clip_min = _expr.var("clip_min")
     clip_max = _expr.var("clip_max")
-    qnode = _quantize.simulated_quantize(
-        data, dom_scale, clip_min, clip_max, kind, sign, rounding)
+    qnode = _quantize.simulated_quantize(data, dom_scale, clip_min, clip_max, kind, sign, rounding)
     qctx.qnode_map[key] = qnode
     return qnode
 
-tvm._ffi.register_func(
-    "relay.quantize.attach_simulated_quantize", attach_simulated_quantize)
+
+tvm._ffi.register_func("relay.quantize.attach_simulated_quantize", attach_simulated_quantize)
 
 
 @register_annotate_function("nn.contrib_conv2d_NCHWc")
 def conv2d_nchwc_rewrite(ref_call, new_args, ctx):
-    warnings.warn("NCHWc layout Conv2D detected, please use a lower "
-                  "optimization level before applying the quantization "
-                  "pass as quantization will have no effect here...")
+    warnings.warn(
+        "NCHWc layout Conv2D detected, please use a lower "
+        "optimization level before applying the quantization "
+        "pass as quantization will have no effect here..."
+    )
 
 
 @register_annotate_function("nn.conv2d")
 def conv2d_rewrite(ref_call, new_args, ctx):
     """Rewrite function for conv2d. Lhs of conv will be quantized to
+    input field, and rhs of conv will be quantized to weight field.
+    Output would be in activation field"""
+    if quantize_context().check_to_skip(ref_call):
+        return None
+
+    lhs_expr, lhs_kind = _get_expr_kind(new_args[0])
+    rhs_expr, rhs_kind = _get_expr_kind(new_args[1])
+
+    if lhs_kind is None or lhs_kind == QAnnotateKind.ACTIVATION:
+        lhs_expr = attach_simulated_quantize(lhs_expr, QAnnotateKind.INPUT)
+
+    assert rhs_kind is None
+    rhs_expr = attach_simulated_quantize(rhs_expr, QAnnotateKind.WEIGHT)
+
+    expr = _forward_op(ref_call, [lhs_expr, rhs_expr])
+
+    return QAnnotateExpr(expr, QAnnotateKind.ACTIVATION)
+
+
+@register_annotate_function("nn.conv1d")
+def conv1d_rewrite(ref_call, new_args, ctx):
+    """Rewrite function for conv1d. Lhs of conv will be quantized to
     input field, and rhs of conv will be quantized to weight field.
     Output would be in activation field"""
     if quantize_context().check_to_skip(ref_call):
@@ -261,8 +285,9 @@ def add_rewrite(ref_call, new_args, ctx):
             rhs_expr = attach_simulated_quantize(rhs_expr, QAnnotateKind.INPUT)
             expr = _forward_op(ref_call, [lhs_expr, rhs_expr])
             return QAnnotateExpr(expr, QAnnotateKind.ACTIVATION)
-        if (lhs_kind == QAnnotateKind.ACTIVATION and rhs_kind == QAnnotateKind.INPUT) or \
-            (lhs_kind == QAnnotateKind.INPUT and rhs_kind == QAnnotateKind.ACTIVATION):
+        if (lhs_kind == QAnnotateKind.ACTIVATION and rhs_kind == QAnnotateKind.INPUT) or (
+            lhs_kind == QAnnotateKind.INPUT and rhs_kind == QAnnotateKind.ACTIVATION
+        ):
             expr = _forward_op(ref_call, [lhs_expr, rhs_expr])
             return QAnnotateExpr(expr, QAnnotateKind.ACTIVATION)
     raise ValueError()
@@ -281,10 +306,13 @@ def identity_rewrite(ref_call, new_args, ctx):
     return QAnnotateExpr(ret_expr, x_kind)
 
 
+register_annotate_function("reshape", identity_rewrite)
 register_annotate_function("clip", identity_rewrite)
 register_annotate_function("nn.relu", identity_rewrite)
 register_annotate_function("strided_slice", identity_rewrite)
 register_annotate_function("nn.avg_pool2d", identity_rewrite)
+register_annotate_function("nn.batch_flatten", identity_rewrite)
+register_annotate_function("transpose", identity_rewrite)
 register_annotate_function("annotation.stop_fusion", identity_rewrite)
 
 
@@ -305,6 +333,25 @@ def pool2d_rewrite(ref_call, new_args, ctx):
 
 
 register_annotate_function("nn.max_pool2d", pool2d_rewrite)
+
+
+def pool1d_rewrite(ref_call, new_args, ctx):
+    """Rewrite function for max pool1d"""
+    if quantize_context().check_to_skip(ref_call):
+        return None
+
+    expr, x_kind = _get_expr_kind(new_args[0])
+
+    if x_kind is None:
+        return None
+    if x_kind == QAnnotateKind.ACTIVATION:
+        expr = attach_simulated_quantize(expr, QAnnotateKind.INPUT)
+
+    expr = _forward_op(ref_call, [expr])
+    return QAnnotateExpr(expr, QAnnotateKind.INPUT)
+
+
+register_annotate_function("nn.max_pool1d", pool1d_rewrite)
 
 
 @register_annotate_function("annotation.cast_hint")

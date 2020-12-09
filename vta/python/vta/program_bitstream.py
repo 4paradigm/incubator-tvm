@@ -18,23 +18,21 @@
 import os
 import argparse
 
+
 def main():
     """Main function"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("target", type=str, default="",
-                        help="target")
-    parser.add_argument("bitstream", type=str, default="",
-                        help="bitstream path")
+    parser.add_argument("target", type=str, default="", help="target")
+    parser.add_argument("bitstream", type=str, default="", help="bitstream path")
     args = parser.parse_args()
 
-    if args.target not in ('pynq', 'ultra96', 'de10nano', 'sim', 'tsim'):
+    if args.target not in ("pynq", "ultra96", "de10nano", "sim", "tsim"):
         raise RuntimeError("Unknown target {}".format(args.target))
 
-    curr_path = os.path.dirname(
-        os.path.abspath(os.path.expanduser(__file__)))
+    curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     path_list = [
         os.path.join(curr_path, "/{}".format(args.bitstream)),
-        os.path.join('./', "{}".format(args.bitstream))
+        os.path.join("./", "{}".format(args.bitstream)),
     ]
     ok_path_list = [p for p in path_list if os.path.exists(p)]
     if not ok_path_list:
@@ -42,17 +40,22 @@ def main():
 
     bitstream_program(args.target, args.bitstream)
 
+
 def pynq_bitstream_program(bitstream_path):
     # pylint: disable=import-outside-toplevel
     from pynq import Bitstream
+
     bitstream = Bitstream(bitstream_path)
     bitstream.download()
+
 
 def de10nano_bitstream_program(bitstream_path):
     # pylint: disable=import-outside-toplevel
     from tvm import get_global_func
+
     program = get_global_func("vta.de10nano.program")
     program(bitstream_path)
+
 
 def intelfocl_bitstream_program(bitstream_path, mem_size=4*1024*1024*1024):
     # pylint: disable=import-outside-toplevel
@@ -60,18 +63,20 @@ def intelfocl_bitstream_program(bitstream_path, mem_size=4*1024*1024*1024):
     program = get_global_func("vta.intelfocl.program")
     program(bitstream_path, mem_size)
 
+
 def bitstream_program(target, bitstream, *args):
     if target in ['pynq', 'ultra96']:
         pynq_bitstream_program(bitstream)
-    elif target in ['de10nano']:
+    elif target in ["de10nano"]:
         de10nano_bitstream_program(bitstream)
-    elif target in ['sim', 'tsim']:
+    elif target in ["sim", "tsim"]:
         # In simulation, bit stream programming is a no-op
         return
     elif target in ['intelfocl']:
         intelfocl_bitstream_program(bitstream, *args)
     else:
         raise RuntimeError("Unknown target {}".format(target))
+
 
 if __name__ == "__main__":
     main()

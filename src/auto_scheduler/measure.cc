@@ -38,6 +38,7 @@ TVM_REGISTER_NODE_TYPE(MeasureResultNode);
 TVM_REGISTER_OBJECT_TYPE(MeasureCallbackNode);
 TVM_REGISTER_OBJECT_TYPE(ProgramRunnerNode);
 TVM_REGISTER_OBJECT_TYPE(ProgramBuilderNode);
+TVM_REGISTER_OBJECT_TYPE(ProgramMeasurerNode);
 TVM_REGISTER_OBJECT_TYPE(LocalBuilderNode);
 TVM_REGISTER_OBJECT_TYPE(LocalRunnerNode);
 TVM_REGISTER_OBJECT_TYPE(RPCRunnerNode);
@@ -123,21 +124,23 @@ Array<BuildResult> LocalBuilderNode::Build(const Array<MeasureInput>& inputs, in
 
 /********** LocalRunner **********/
 LocalRunner::LocalRunner(int timeout, int number, int repeat, int min_repeat_ms,
-                         double cooldown_interval) {
+                         double cooldown_interval, bool enable_cpu_cache_flush) {
   ObjectPtr<LocalRunnerNode> node = make_object<LocalRunnerNode>();
   node->timeout = timeout;
   node->number = number;
   node->repeat = repeat;
   node->min_repeat_ms = min_repeat_ms;
   node->cooldown_interval = cooldown_interval;
+  node->enable_cpu_cache_flush = enable_cpu_cache_flush;
   data_ = std::move(node);
 }
 
 Array<MeasureResult> LocalRunnerNode::Run(const Array<MeasureInput>& inputs,
                                           const Array<BuildResult>& build_results, int verbose) {
   if (const auto* f = runtime::Registry::Get("auto_scheduler.local_runner.run")) {
-    Array<MeasureResult> results = (*f)(inputs, build_results, timeout, number, repeat,
-                                        min_repeat_ms, cooldown_interval, verbose);
+    Array<MeasureResult> results =
+        (*f)(inputs, build_results, timeout, number, repeat, min_repeat_ms, cooldown_interval,
+             enable_cpu_cache_flush, verbose);
     return results;
   }
   LOG(FATAL) << "auto_scheduler.local_runner.run is not registered. "
@@ -149,7 +152,7 @@ Array<MeasureResult> LocalRunnerNode::Run(const Array<MeasureInput>& inputs,
 /********** RPCRunner **********/
 RPCRunner::RPCRunner(const String& key, const String& host, int port, int priority, int n_parallel,
                      int timeout, int number, int repeat, int min_repeat_ms,
-                     double cooldown_interval) {
+                     double cooldown_interval, bool enable_cpu_cache_flush) {
   auto node = make_object<RPCRunnerNode>();
   node->key = key;
   node->host = host;
@@ -161,6 +164,7 @@ RPCRunner::RPCRunner(const String& key, const String& host, int port, int priori
   node->repeat = repeat;
   node->min_repeat_ms = min_repeat_ms;
   node->cooldown_interval = cooldown_interval;
+  node->enable_cpu_cache_flush = enable_cpu_cache_flush;
   data_ = std::move(node);
 }
 
@@ -169,7 +173,7 @@ Array<MeasureResult> RPCRunnerNode::Run(const Array<MeasureInput>& inputs,
   if (const auto* f = runtime::Registry::Get("auto_scheduler.rpc_runner.run")) {
     Array<MeasureResult> results =
         (*f)(inputs, build_results, key, host, port, priority, n_parallel, timeout, number, repeat,
-             min_repeat_ms, cooldown_interval, verbose);
+             min_repeat_ms, cooldown_interval, enable_cpu_cache_flush, verbose);
     return results;
   } else {
     LOG(FATAL) << "auto_scheduler.rpc_runner.run is not registered. "
@@ -182,15 +186,15 @@ Array<MeasureResult> RPCRunnerNode::Run(const Array<MeasureInput>& inputs,
 /********** ProgramMeasurer **********/
 ProgramMeasurer::ProgramMeasurer(ProgramBuilder builder, ProgramRunner runner,
                                  Optional<Array<MeasureCallback>> callbacks, int verbose,
-                                 int max_continous_error) {
+                                 int max_continuous_error) {
   auto node = make_object<ProgramMeasurerNode>();
   node->builder = std::move(builder);
   node->runner = std::move(runner);
   node->callbacks = std::move(callbacks);
   node->verbose = verbose;
-  node->max_continous_error = max_continous_error < 0
-                                  ? ProgramMeasurerNode::DEFAULT_MAX_CONTINOUS_ERROR
-                                  : max_continous_error;
+  node->max_continuous_error = max_continuous_error < 0
+                                   ? ProgramMeasurerNode::DEFAULT_MAX_CONTINUOUS_ERROR
+                                   : max_continuous_error;
   data_ = std::move(node);
 }
 
@@ -199,21 +203,26 @@ void ProgramMeasurerNode::Reset() {
   best_flops.clear();
   best_ct.clear();
   best_state.clear();
+  has_valid.clear();
 }
 
-void ProgramMeasurerNode::Measure(const SearchTask& task, const SearchPolicy& policy,
-                                  const Array<MeasureInput>& inputs, Array<MeasureResult>* results,
-                                  int batch_size) {
-  results->clear();
-  results->reserve(inputs.size());
+Array<MeasureResult> ProgramMeasurerNode::Measure(const SearchTask& task,
+                                                  const SearchPolicy& policy,
+                                                  const Array<MeasureInput>& inputs,
+                                                  int batch_size) {
+  auto t_begin = std::chrono::high_resolution_clock::now();
+
+  Array<MeasureResult> results;
+  results.reserve(inputs.size());
 
   if (batch_size == -1) {
     // set default batch size
     batch_size = builder->n_parallel * 2;
   }
 
-  StdCout(verbose) << "Get " << inputs.size() << " programs for measure. (This may take a while)"
-                   << std::endl;
+  int old_verbosity = verbose;
+
+  StdCout(verbose) << "Get " << inputs.size() << " programs to measure:" << std::endl;
 
   for (size_t i = 0; i < inputs.size(); i += batch_size) {
     Array<MeasureInput> input_batch(inputs.begin() + i,
@@ -225,16 +234,18 @@ void ProgramMeasurerNode::Measure(const SearchTask& task, const SearchPolicy& po
 
     // update current best state according to the new measure result
     for (size_t j = 0; j < input_batch.size(); ++j) {
+      const String& workload_key = input_batch[j]->task->workload_key;
       double flops;
+
       if (result_batch[j]->error_no == 0) {
         flops = task->compute_dag->flop_ct / FloatArrayMean(result_batch[j]->costs);
         error_ct = 0;
+        has_valid.insert(workload_key);
       } else {
         flops = 0.0;
         error_ct++;
       }
 
-      const String& workload_key = input_batch[j]->task->workload_key;
       if (flops > best_flops[workload_key]) {
         best_flops[workload_key] = flops;
         best_state[workload_key] = input_batch[j]->state;
@@ -242,11 +253,12 @@ void ProgramMeasurerNode::Measure(const SearchTask& task, const SearchPolicy& po
       }
 
       ct++;
-      StdCout(verbose) << std::fixed << std::setprecision(2) << Chars('=', 50) << "\n"
-                       << "No: " << ct << "\tGFLOPS: " << flops / 1e9 << " / "
-                       << best_flops[workload_key] / 1e9 << "\tresults: " << result_batch[j] << "\n"
-                       << Chars('=', 50) << "\n"
-                       << input_batch[j]->state << "\n";
+      StdCout(verbose, 2) << std::fixed << std::setprecision(2) << Chars('=', 50) << "\n"
+                          << "No: " << ct << "\tGFLOPS: " << flops / 1e9 << " / "
+                          << best_flops[workload_key] / 1e9 << "\tresults: " << result_batch[j]
+                          << "\n"
+                          << Chars('=', 50) << "\n"
+                          << input_batch[j]->state << "\n";
     }
 
     // Call callback functions
@@ -258,13 +270,21 @@ void ProgramMeasurerNode::Measure(const SearchTask& task, const SearchPolicy& po
 
     // Store result batch
     for (auto& res : result_batch) {
-      results->push_back(res);
+      results.push_back(res);
     }
 
-    if (error_ct > max_continous_error) {
-      LOG(FATAL) << "Too many errors happened during tuning";
+    if (error_ct > max_continuous_error) {
+      LOG(WARNING) << "Too many errors happened during tuning. Switching to debug mode."
+                   << std::endl;
+      verbose = 2;
+    } else {
+      verbose = old_verbosity;
     }
   }
+
+  PrintTimeElapsed(t_begin, "measurement", verbose);
+
+  return results;
 }
 
 void ProgramMeasurerNode::SilentMeasure(const SearchTask& task, const Array<MeasureInput>& inputs,
@@ -296,7 +316,7 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
         auto old_config = p->stream.precision(4);
         for (size_t i = 0; i < node->costs.size(); ++i) {
           auto pf = node->costs[i].as<FloatImmNode>();
-          CHECK(pf != nullptr);
+          ICHECK(pf != nullptr);
           p->stream << pf->value;
           if (i != node->costs.size() - 1) {
             p->stream << ",";
@@ -340,6 +360,12 @@ TVM_REGISTER_GLOBAL("auto_scheduler.MeasureResult")
       return MeasureResult(costs, error_no, error_msg, all_cost, timestamp);
     });
 
+TVM_REGISTER_GLOBAL("auto_scheduler.ProgramMeasurer")
+    .set_body_typed([](ProgramBuilder builder, ProgramRunner runner,
+                       Array<MeasureCallback> callbacks, int verbose, int max_continuous_error) {
+      return ProgramMeasurer(builder, runner, callbacks, verbose, max_continuous_error);
+    });
+
 TVM_REGISTER_GLOBAL("auto_scheduler.ProgramBuilderBuild")
     .set_body_typed([](const ProgramBuilder& builder, const Array<MeasureInput>& inputs,
                        int verbose) { return builder->Build(inputs, verbose); });
@@ -356,16 +382,17 @@ TVM_REGISTER_GLOBAL("auto_scheduler.LocalBuilder")
 
 TVM_REGISTER_GLOBAL("auto_scheduler.LocalRunner")
     .set_body_typed([](int timeout, int number, int repeat, int min_repeat_ms,
-                       double cooldown_interval) {
-      return LocalRunner(timeout, number, repeat, min_repeat_ms, cooldown_interval);
+                       double cooldown_interval, bool enable_cpu_cache_flush) {
+      return LocalRunner(timeout, number, repeat, min_repeat_ms, cooldown_interval,
+                         enable_cpu_cache_flush);
     });
 
 TVM_REGISTER_GLOBAL("auto_scheduler.RPCRunner")
     .set_body_typed([](const String& key, const String& host, int port, int priority,
                        int n_parallel, int timeout, int number, int repeat, int min_repeat_ms,
-                       double cooldown_interval) {
+                       double cooldown_interval, bool enable_cpu_cache_flush) {
       return RPCRunner(key, host, port, priority, n_parallel, timeout, number, repeat,
-                       min_repeat_ms, cooldown_interval);
+                       min_repeat_ms, cooldown_interval, enable_cpu_cache_flush);
     });
 
 }  // namespace auto_scheduler

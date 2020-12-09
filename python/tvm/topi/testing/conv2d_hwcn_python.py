@@ -18,7 +18,7 @@
 """Convolution in python"""
 import numpy as np
 import scipy.signal
-from tvm.topi.nn.util import get_pad_tuple
+from tvm.topi.nn.utils import get_pad_tuple
 
 
 def conv2d_hwcn_python(a_np, w_np, stride, padding):
@@ -69,10 +69,9 @@ def conv2d_hwcn_python(a_np, w_np, stride, padding):
             for c in range(in_channel):
                 if pad_h > 0 or pad_w > 0:
                     apad = np.zeros((in_height + pad_h, in_width + pad_w))
-                    apad[pad_top:pad_top + in_height, pad_left:pad_left + in_width] = at[n, c]
+                    apad[pad_top : pad_top + in_height, pad_left : pad_left + in_width] = at[n, c]
                 else:
                     apad = at[n, c]
-                out = scipy.signal.convolve2d(
-                    apad, np.rot90(np.rot90(wt[f, c])), mode='valid')
+                out = scipy.signal.convolve2d(apad, np.rot90(np.rot90(wt[f, c])), mode="valid")
                 bt[n, f] += out[::stride, ::stride]
     return bt.transpose((2, 3, 1, 0))

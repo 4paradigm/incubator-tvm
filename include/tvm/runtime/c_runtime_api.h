@@ -61,7 +61,7 @@
 #endif
 
 // TVM version
-#define TVM_VERSION "0.7.dev1"
+#define TVM_VERSION "0.8.dev0"
 
 // TVM Runtime is DLPack compatible.
 #include <dlpack/dlpack.h>
@@ -365,6 +365,12 @@ TVM_DLL int TVMFuncGetGlobal(const char* name, TVMFunctionHandle* out);
  * \return 0 when success, -1 when failure happens
  */
 TVM_DLL int TVMFuncListGlobalNames(int* out_size, const char*** out_array);
+
+/*!
+ * \brief Remove a global function.
+ * \param name The name of the function.
+ */
+TVM_DLL int TVMFuncRemoveGlobal(const char* name);
 
 // Array related apis for quick proptyping
 /*!

@@ -31,7 +31,8 @@ const DL_UINT_CODE: u8 = 1;
 const DL_FLOAT_CODE: u8 = 2;
 const DL_HANDLE: u8 = 3;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(C)]
 pub struct DataType {
     code: u8,
     bits: u8,
@@ -80,6 +81,10 @@ impl DataType {
 
     pub const fn float(bits: u8, lanes: u16) -> DataType {
         DataType::new(DL_FLOAT_CODE, bits, lanes)
+    }
+
+    pub const fn float32() -> DataType {
+        Self::float(32, 1)
     }
 
     pub const fn uint(bits: u8, lanes: u16) -> DataType {

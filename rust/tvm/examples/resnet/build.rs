@@ -17,16 +17,24 @@
  * under the License.
  */
 
-use std::{path::Path, process::Command};
+use anyhow::{Context, Result};
+use std::{io::Write, path::Path, process::Command};
 
-fn main() {
+fn main() -> Result<()> {
+    let out_dir = std::env::var("CARGO_MANIFEST_DIR")?;
     let output = Command::new("python3")
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/src/build_resnet.py"))
-        .arg(&format!("--build-dir={}", env!("CARGO_MANIFEST_DIR")))
+        .arg(&format!("--build-dir={}", out_dir))
         .output()
-        .expect("Failed to execute command");
+        .with_context(|| anyhow::anyhow!("failed to run python3"))?;
+    if !output.status.success() {
+        std::io::stdout()
+            .write_all(&output.stderr)
+            .context("Failed to write error")?;
+        panic!("Failed to execute build script");
+    }
     assert!(
-        Path::new(&format!("{}/deploy_lib.o", env!("CARGO_MANIFEST_DIR"))).exists(),
+        Path::new(&format!("{}/deploy_lib.o", out_dir)).exists(),
         "Could not prepare demo: {}",
         String::from_utf8(output.stderr)
             .unwrap()
@@ -35,8 +43,7 @@ fn main() {
             .last()
             .unwrap_or("")
     );
-    println!(
-        "cargo:rustc-link-search=native={}",
-        env!("CARGO_MANIFEST_DIR")
-    );
+    println!("cargo:rustc-link-search=native={}", out_dir);
+
+    Ok(())
 }

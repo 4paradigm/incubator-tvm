@@ -40,7 +40,7 @@ TVM_REGISTER_GLOBAL("test.seq.strategy")
                        const Target& target) {
       relay::FTVMCompute fcompute = [](const Attrs& attrs, const Array<te::Tensor>& inputs,
                                        const Type& out_type) -> Array<te::Tensor> {
-        CHECK_EQ(inputs.size(), 2U);
+        ICHECK_EQ(inputs.size(), 2U);
         return {topi::add(inputs[0], inputs[1])};
       };
       relay::FTVMSchedule fschedule = [](const Attrs& attrs, const Array<te::Tensor>& outs,
@@ -95,15 +95,15 @@ TEST(Relay, Sequential) {
   pass_ctx->config.Set("relay.fallback_device_type", Integer(1));
   {
     tvm::With<relay::transform::PassContext> ctx_scope(pass_ctx);
-    tvm::With<tvm::Target> tctx(tvm::Target::Create("llvm"));
+    tvm::With<tvm::Target> tctx(tvm::Target("llvm"));
     mod = seq(mod);
   }
 
-  CHECK(mod.defined());
+  ICHECK(mod.defined());
   auto entry_func = mod->GetGlobalVar("main");
-  CHECK(entry_func.defined());
+  ICHECK(entry_func.defined());
   relay::Function f = Downcast<relay::Function>(mod->Lookup("main"));
-  CHECK(f.defined());
+  ICHECK(f.defined());
 
   // Expected function
   auto c1 = relay::Constant(c_data);
@@ -118,7 +118,7 @@ TEST(Relay, Sequential) {
   auto mod1 = IRModule::FromExpr(expected_func);
   mod1 = relay::transform::InferType()(mod1);
   auto expected = mod1->Lookup("main");
-  CHECK(tvm::StructuralEqual()(f, expected));
+  ICHECK(tvm::StructuralEqual()(f, expected));
 }
 
 int main(int argc, char** argv) {

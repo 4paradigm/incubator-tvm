@@ -48,6 +48,21 @@ using namespace tvm::te;
 inline bool IsConstInt(PrimExpr expr) { return expr->IsInstance<tvm::tir::IntImmNode>(); }
 
 /*!
+ * \brief Test whether the given Array has every element as constant integer
+ *
+ * \param array the array to query
+ *
+ * \return true if every element in array is constant int or uint, false otherwise.
+ */
+inline bool IsConstIntArray(Array<PrimExpr> array) {
+  bool is_const_int = true;
+  for (auto const& elem : array) {
+    is_const_int &= elem->IsInstance<tvm::tir::IntImmNode>();
+  }
+  return is_const_int;
+}
+
+/*!
  * \brief Get the value of the given constant integer expression. An error
  * is logged if the given expression is not a constant integer.
  *
@@ -76,7 +91,7 @@ inline std::vector<int> GetConstIntValues(Array<PrimExpr> exprs, const std::stri
   std::vector<int> result;
   if (!exprs.defined()) return result;
   for (auto expr : exprs) {
-    CHECK(IsConstInt(expr)) << "All elements of " << var_name << " must be constant integers";
+    ICHECK(IsConstInt(expr)) << "All elements of " << var_name << " must be constant integers";
     result.push_back(GetConstInt(expr));
   }
   return result;
@@ -96,7 +111,7 @@ inline std::vector<int64_t> GetConstInt64Values(Array<PrimExpr> exprs,
   std::vector<int64_t> result;
   if (!exprs.defined()) return result;
   for (auto expr : exprs) {
-    CHECK(IsConstInt(expr)) << "All elements of " << var_name << " must be constant integers";
+    ICHECK(IsConstInt(expr)) << "All elements of " << var_name << " must be constant integers";
     result.push_back(GetConstInt(expr));
   }
   return result;
@@ -115,8 +130,10 @@ inline bool EqualCheck(PrimExpr lhs, PrimExpr rhs) {
   tvm::tir::ExprDeepEqual expr_equal;
   bool result = expr_equal(lhs, rhs);
   if (!result) {
-    PrimExpr zero(0);
-    result = expr_equal(tvm::arith::Analyzer().Simplify(lhs - rhs), zero);
+    PrimExpr t = tvm::arith::Analyzer().Simplify(lhs - rhs);
+    if (const IntImmNode* i = t.as<IntImmNode>()) {
+      result = i->value == 0;
+    }
   }
   return result;
 }

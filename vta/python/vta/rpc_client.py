@@ -22,6 +22,7 @@ from .bitstream import download_bitstream, get_bitstream_path
 from tvm import rpc
 from vta import program_bitstream
 
+
 def reconfig_runtime(remote):
     """Reconfigure remote runtime based on current hardware spec.
 
@@ -53,7 +54,7 @@ def program_fpga(remote, bitstream=None):
     else:
         bitstream = get_bitstream_path()
         if not os.path.isfile(bitstream):
-            if env.TARGET == 'de10nano':
+            if env.TARGET == "de10nano":
                 return
             download_bitstream()
 

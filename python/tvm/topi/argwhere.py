@@ -16,7 +16,9 @@
 # under the License.
 # pylint: disable=invalid-name, too-many-arguments, too-many-nested-blocks
 """Argwhere operator"""
+import tvm
 from tvm.te import hybrid
+
 
 @hybrid.script
 def hybrid_argwhere_1d(output_shape, condition):
@@ -40,6 +42,7 @@ def hybrid_argwhere_1d(output_shape, condition):
             a[valid_index, 0] = i1
             valid_index += 1
     return a
+
 
 @hybrid.script
 def hybrid_argwhere_2d(output_shape, condition):
@@ -66,6 +69,7 @@ def hybrid_argwhere_2d(output_shape, condition):
                 a[valid_index, 1] = i2
                 valid_index += 1
     return a
+
 
 @hybrid.script
 def hybrid_argwhere_3d(output_shape, condition):
@@ -95,6 +99,7 @@ def hybrid_argwhere_3d(output_shape, condition):
                     a[valid_index, 2] = i3
                     valid_index += 1
     return a
+
 
 @hybrid.script
 def hybrid_argwhere_4d(output_shape, condition):
@@ -127,6 +132,7 @@ def hybrid_argwhere_4d(output_shape, condition):
                         a[valid_index, 3] = i4
                         valid_index += 1
     return a
+
 
 @hybrid.script
 def hybrid_argwhere_5d(output_shape, condition):
@@ -163,6 +169,8 @@ def hybrid_argwhere_5d(output_shape, condition):
                             valid_index += 1
     return a
 
+
+@tvm.target.generic_func
 def argwhere(output_shape, condition):
     """Find the indices of elements of a tensor that are non-zero.
 

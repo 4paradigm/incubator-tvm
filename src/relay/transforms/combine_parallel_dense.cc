@@ -43,7 +43,7 @@
 
 #include "./combine_parallel_op_batch.h"
 #include "./expr_subst.h"
-#include "pattern_util.h"
+#include "pattern_utils.h"
 
 namespace tvm {
 namespace relay {
@@ -61,8 +61,8 @@ class ParallelDenseToBatchCombiner : public ParallelOpBatchCombiner {
     StructuralEqual eq;
     const auto* attrs_a = a->attrs.as<DenseAttrs>();
     const auto* attrs_b = b->attrs.as<DenseAttrs>();
-    CHECK(attrs_a);
-    CHECK(attrs_b);
+    ICHECK(attrs_a);
+    ICHECK(attrs_b);
     const auto* weight_a = a->args[1]->type_as<TensorTypeNode>();
     const auto* weight_b = b->args[1]->type_as<TensorTypeNode>();
 
@@ -89,7 +89,7 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
     const auto* attrs_b = b->attrs.as<DenseAttrs>();
     const auto* weight_a = a->args[1]->type_as<TensorTypeNode>();
     const auto* weight_b = b->args[1]->type_as<TensorTypeNode>();
-    CHECK(attrs_a != nullptr && attrs_b != nullptr && weight_a != nullptr && weight_b != nullptr);
+    ICHECK(attrs_a != nullptr && attrs_b != nullptr && weight_a != nullptr && weight_b != nullptr);
     // output dims (weight->shape[0]) can be different
     return eq(attrs_a->out_dtype, attrs_b->out_dtype) && eq(weight_a->shape[1], weight_b->shape[1]);
   }
@@ -102,7 +102,7 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
     // concat all weights into one
     std::tie(new_weight, new_output_dims) = TransformWeight(branches);
     const auto* origin_attrs = branches[0][0]->attrs.as<DenseAttrs>();
-    CHECK(origin_attrs);
+    ICHECK(origin_attrs);
     const auto dense_attrs = make_object<DenseAttrs>();
     dense_attrs->units = new_output_dims;
     dense_attrs->out_dtype = origin_attrs->out_dtype;
@@ -115,7 +115,7 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
     auto tb = b->args[index]->type_as<TensorTypeNode>();
     auto toutput_a = a->type_as<TensorTypeNode>();
     auto toutput_b = b->type_as<TensorTypeNode>();
-    CHECK(ta != nullptr && tb != nullptr && toutput_a != nullptr && toutput_b != nullptr);
+    ICHECK(ta != nullptr && tb != nullptr && toutput_a != nullptr && toutput_b != nullptr);
 
     if (!eq(ta->dtype, tb->dtype) || ta->shape.size() != tb->shape.size()) {
       return false;
@@ -148,7 +148,7 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
         auto parent = branch[depth]->args[parent_index];
         auto& parent_shape = parent->type_as<TensorTypeNode>()->shape;
         auto out_dim = tir::as_const_int(parent_shape[parent_shape.size() - 1]);
-        CHECK(out_dim != nullptr);
+        ICHECK(out_dim != nullptr);
 
         auto arg = branch[depth]->args[i];
         auto& arg_shape = arg->type_as<TensorTypeNode>()->shape;
@@ -158,7 +158,7 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
           arg = MakeExpandDims(arg, -1, 1);
         } else {
           auto arg_last_dim = tir::as_const_int(arg_shape[arg_shape.size() - 1]);
-          CHECK(arg_last_dim != nullptr);
+          ICHECK(arg_last_dim != nullptr);
           if (*out_dim > 1 && *arg_last_dim == 1) {
             repeat_last_dim = true;
           }
@@ -182,10 +182,10 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
       const CallNode* call = branch[depth];
       auto& out_shape = call->type_as<TensorTypeNode>()->shape;
       auto out_dims = tir::as_const_int(out_shape[out_shape.size() - 1]);
-      CHECK(out_dims != nullptr);
-      std::vector<int64_t> begin;
-      std::vector<int64_t> end;
-      std::vector<int64_t> strides;
+      ICHECK(out_dims != nullptr);
+      Array<Integer> begin;
+      Array<Integer> end;
+      Array<Integer> strides;
       for (size_t k = 0; k < out_shape.size() - 1; ++k) {
         begin.push_back(0);
         end.push_back(-1);
@@ -195,11 +195,7 @@ class ParallelDenseToDenseCombiner : public ParallelOpCombiner {
       end.push_back(*out_dims);
       strides.push_back(1);
       index += *out_dims;
-      std::vector<int64_t> ndarray_shape = {static_cast<int64_t>(begin.size())};
-      Constant begin_const = MakeConstantTensor(DataType::Int(64), ndarray_shape, begin);
-      Constant end_const = MakeConstantTensor(DataType::Int(64), ndarray_shape, end);
-      Constant strides_const = MakeConstantTensor(DataType::Int(64), ndarray_shape, strides);
-      auto slice = MakeStridedSlice(data, begin_const, end_const, strides_const, "size");
+      auto slice = MakeStridedSlice(data, begin, end, strides, "size");
       subst_map->insert({GetRef<Expr>(branch[depth]), slice});
     }
   }

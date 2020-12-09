@@ -21,10 +21,12 @@ from tvm.relay import testing
 import numpy as np
 from tvm.relay import Expr
 from tvm.relay.analysis import free_vars
+import pytest
 
 DEBUG_PRINT = False
 
-SEMVER = "#[version = \"0.0.5\"]\n"
+SEMVER = '#[version = "0.0.5"]\n'
+
 
 def astext(program, unify_free_vars=False):
     text = program.astext()
@@ -38,10 +40,12 @@ def astext(program, unify_free_vars=False):
 
     return text
 
+
 def show(text):
     if DEBUG_PRINT:
         print("---------------------------")
         print(text)
+
 
 def test_func():
     x = relay.var("x", shape=(3, 2))
@@ -54,20 +58,21 @@ def test_func():
     show(astext(f))
 
 
-def test_env():
+def test_mod():
     x = relay.var("x", "float32")
     y = relay.var("y", "float32")
     z = relay.add(x, y)
     z = relay.add(z, z)
     f = relay.Function([x, y], z)
-    env = tvm.IRModule()
-    env["myf"] = f
-    text = astext(env)
+    mod = tvm.IRModule()
+    mod["myf"] = f
+    mod = relay.transform.InferType()(mod)
+    text = astext(mod)
     assert "def @myf" in text
-    assert "def @myf" in str(env)
+    assert "def @myf" in str(mod)
     assert "add(%0, %0) /* ty=float32 */" in text
-    assert "add(%0, %0) /* ty=float32 */" in str(env)
-    show(env.astext(annotate=lambda x: str(x.checked_type.dtype) if type(x) == relay.Call else ""))
+    assert "add(%0, %0) /* ty=float32 */" in str(mod)
+    show(mod.astext(annotate=lambda x: str(x.checked_type.dtype) if type(x) == relay.Call else ""))
     show(text)
 
 
@@ -75,10 +80,7 @@ def test_meta_data():
     n, c, h, w = te.size_var("n"), 10, 224, 224
     x = relay.var("x", shape=(n, c, h, w))
     w = relay.var("w")
-    z = relay.nn.conv2d(x, w,
-                        kernel_size=(3, 3),
-                        padding=(1, 1),
-                        channels=2)
+    z = relay.nn.conv2d(x, w, kernel_size=(3, 3), padding=(1, 1), channels=2)
     f = relay.Function([x, w], z)
     text = astext(f, unify_free_vars=True)
     text_no_meta = str(f)
@@ -89,7 +91,7 @@ def test_meta_data():
     assert "type_key" in text
     assert "type_key" not in text_no_meta
 
-    text = astext(relay.const([1,2,3]))
+    text = astext(relay.const([1, 2, 3]))
     assert "meta[relay.Constant][0]" in text
 
 
@@ -167,13 +169,14 @@ def test_lstm():
     net, _ = tvm.relay.testing.lstm.get_workload(4, 4)
     astext(net)
 
+
 def test_inception_v3():
     net, _ = tvm.relay.testing.inception_v3.get_workload(batch_size=1)
     astext(net)
 
 
 def test_squeezenet():
-    for version in ['1.0', '1.1']:
+    for version in ["1.0", "1.1"]:
         net, _ = tvm.relay.testing.squeezenet.get_workload(batch_size=1, version=version)
         astext(net)
 
@@ -191,29 +194,27 @@ def test_densenet():
 def test_call_node_order():
     x = relay.var("x")
     y = relay.var("y")
-    prog = relay.Call(relay.Function([x], x), [relay.Call(relay.Function([y], y), [relay.const(1)])])
-    assert astext(prog) == SEMVER + \
-        ("%0 = fn (%y) {\n"
-         "  %y\n"
-         "};\n"
-         "%1 = %0(1);\n"
-         "%2 = fn (%x) {\n"
-         "  %x\n"
-         "};\n"
-         "%2(%1)")
+    prog = relay.Call(
+        relay.Function([x], x), [relay.Call(relay.Function([y], y), [relay.const(1)])]
+    )
+    assert astext(prog) == SEMVER + (
+        "%0 = fn (%y) {\n"
+        "  %y\n"
+        "};\n"
+        "%1 = %0(1);\n"
+        "%2 = fn (%x) {\n"
+        "  %x\n"
+        "};\n"
+        "%2(%1)"
+    )
 
 
 def test_let_inlining():
     tup = relay.Tuple([relay.const(0), relay.const(0)])
     x = relay.var("x")
-    assert astext(relay.Let(x, tup, tup)) == SEMVER + \
-        ("%0 = (0, 0);\n"
-         "let %x = %0;\n"
-         "%0")
+    assert astext(relay.Let(x, tup, tup)) == SEMVER + ("%0 = (0, 0);\n" "let %x = %0;\n" "%0")
 
-    assert astext(relay.Let(x, tup, x)) == SEMVER + \
-        ("let %x = (0, 0);\n"
-         "%x")
+    assert astext(relay.Let(x, tup, x)) == SEMVER + ("let %x = (0, 0);\n" "%x")
 
 
 def test_zeros():
@@ -250,6 +251,23 @@ def test_null_attribute():
     assert "TestAttribute=(nullptr)" in txt
 
 
+def test_span():
+    x = relay.var("x", shape=(3, 2))
+    y = relay.var("y")
+    one = relay.const(10e10, dtype="float32")
+    z = relay.add(x, one)
+    z = relay.Call(
+        z.op, z.args, z.attrs, z.type_args, relay.Span(relay.SourceName("Add0"), 0, 0, 0, 0)
+    )
+    z = relay.add(z, z)
+    z = relay.Call(
+        z.op, z.args, z.attrs, z.type_args, relay.Span(relay.SourceName("Add1"), 0, 0, 0, 0)
+    )
+    f = relay.Function([x, y], z)
+    txt = astext(f)
+    assert "Add0" in txt
+    assert "Add1" in txt
+
+
 if __name__ == "__main__":
-    import sys
-    pytext.argv(sys.argv)
+    pytest.main([__file__])

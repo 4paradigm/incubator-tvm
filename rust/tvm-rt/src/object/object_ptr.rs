@@ -19,9 +19,11 @@
 
 use std::convert::TryFrom;
 use std::ffi::CString;
+use std::fmt;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicI32;
 
+use tvm_macros::Object;
 use tvm_sys::ffi::{self, TVMObjectFree, TVMObjectRetain, TVMObjectTypeKey2Index};
 use tvm_sys::{ArgValue, RetValue};
 
@@ -35,7 +37,9 @@ type Deleter = unsafe extern "C" fn(object: *mut Object) -> ();
 /// table, an atomic reference count, and a customized deleter which
 /// will be invoked when the reference count is zero.
 ///
-#[derive(Debug)]
+#[derive(Debug, Object)]
+#[ref_name = "ObjectRef"]
+#[type_key = "runtime.Object"]
 #[repr(C)]
 pub struct Object {
     /// The index into TVM's runtime type information table.
@@ -122,7 +126,7 @@ impl Object {
     /// By using associated constants and generics we can provide a
     /// type indexed abstraction over allocating objects with the
     /// correct index and deleter.
-    pub fn base_object<T: IsObject>() -> Object {
+    pub fn base<T: IsObject>() -> Object {
         let index = Object::get_type_index::<T>();
         Object::new(index, delete::<T>)
     }
@@ -144,6 +148,18 @@ impl Object {
     }
 }
 
+// impl fmt::Debug for Object {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let index =
+//             format!("{} // key: {}", self.type_index, "the_key");
+
+//         f.debug_struct("Object")
+//          .field("type_index", &index)
+//          // TODO(@jroesch: do we expose other fields?)
+//          .finish()
+//     }
+// }
+
 /// An unsafe trait which should be implemented for an object
 /// subtype.
 ///
@@ -151,22 +167,12 @@ impl Object {
 /// index, a method for accessing the base object given the
 /// subtype, and a typed delete method which is specialized
 /// to the subtype.
-pub unsafe trait IsObject {
+pub unsafe trait IsObject: AsRef<Object> + std::fmt::Debug {
     const TYPE_KEY: &'static str;
-
-    fn as_object<'s>(&'s self) -> &'s Object;
 
     unsafe extern "C" fn typed_delete(object: *mut Self) {
         let object = Box::from_raw(object);
         drop(object)
-    }
-}
-
-unsafe impl IsObject for Object {
-    const TYPE_KEY: &'static str = "runtime.Object";
-
-    fn as_object<'s>(&'s self) -> &'s Object {
-        self
     }
 }
 
@@ -177,14 +183,6 @@ unsafe impl IsObject for Object {
 #[repr(C)]
 pub struct ObjectPtr<T: IsObject> {
     pub ptr: NonNull<T>,
-}
-
-fn inc_ref<T: IsObject>(ptr: NonNull<T>) {
-    unsafe { ptr.as_ref().as_object().inc_ref() }
-}
-
-fn dec_ref<T: IsObject>(ptr: NonNull<T>) {
-    unsafe { ptr.as_ref().as_object().dec_ref() }
 }
 
 impl ObjectPtr<Object> {
@@ -199,14 +197,14 @@ impl ObjectPtr<Object> {
 
 impl<T: IsObject> Clone for ObjectPtr<T> {
     fn clone(&self) -> Self {
-        inc_ref(self.ptr);
+        unsafe { self.ptr.as_ref().as_ref().inc_ref() }
         ObjectPtr { ptr: self.ptr }
     }
 }
 
 impl<T: IsObject> Drop for ObjectPtr<T> {
     fn drop(&mut self) {
-        dec_ref(self.ptr);
+        unsafe { self.ptr.as_ref().as_ref().dec_ref() }
     }
 }
 
@@ -219,34 +217,42 @@ impl<T: IsObject> ObjectPtr<T> {
     }
 
     pub fn new(object: T) -> ObjectPtr<T> {
+        object.as_ref().inc_ref();
         let object_ptr = Box::new(object);
         let object_ptr = Box::leak(object_ptr);
         let ptr = NonNull::from(object_ptr);
-        inc_ref(ptr);
         ObjectPtr { ptr }
     }
 
     pub fn count(&self) -> i32 {
         // need to do atomic read in C++
         // ABI compatible atomics is funky/hard.
-        self.as_object()
+        self.as_ref()
             .ref_count
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    fn as_object<'s>(&'s self) -> &'s Object {
-        unsafe { self.ptr.as_ref().as_object() }
+    /// This method avoid running the destructor on self once it's dropped, so we don't accidentally release the memory
+    unsafe fn cast<U: IsObject>(self) -> ObjectPtr<U> {
+        let ptr = self.ptr.cast();
+        std::mem::forget(self);
+        ObjectPtr { ptr }
     }
 
-    pub fn upcast(self) -> ObjectPtr<Object> {
-        ObjectPtr {
-            ptr: self.ptr.cast(),
-        }
+    pub fn upcast<U>(self) -> ObjectPtr<U>
+    where
+        U: IsObject,
+        T: AsRef<U>,
+    {
+        unsafe { self.cast() }
     }
 
-    pub fn downcast<U: IsObject>(self) -> Result<ObjectPtr<U>, Error> {
+    pub fn downcast<U>(self) -> Result<ObjectPtr<U>, Error>
+    where
+        U: IsObject + AsRef<T>,
+    {
         let child_index = Object::get_type_index::<U>();
-        let object_index = self.as_object().type_index;
+        let object_index = self.as_ref().type_index;
 
         let is_derived = if child_index == object_index {
             true
@@ -256,10 +262,7 @@ impl<T: IsObject> ObjectPtr<T> {
         };
 
         if is_derived {
-            // NB: self gets dropped here causng a dec ref which we need to migtigate with an inc ref before it is dropped.
-            inc_ref(self.ptr);
-            let ptr = self.ptr.cast();
-            Ok(ObjectPtr { ptr })
+            Ok(unsafe { self.cast() })
         } else {
             Err(Error::downcast("TODOget_type_key".into(), U::TYPE_KEY))
         }
@@ -271,6 +274,13 @@ impl<T: IsObject> std::ops::Deref for ObjectPtr<T> {
 
     fn deref(&self) -> &Self::Target {
         unsafe { self.ptr.as_ref() }
+    }
+}
+
+impl<T: IsObject> fmt::Debug for ObjectPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use std::ops::Deref;
+        write!(f, "{:?}", self.deref())
     }
 }
 
@@ -286,14 +296,22 @@ impl<'a, T: IsObject> TryFrom<RetValue> for ObjectPtr<T> {
     type Error = Error;
 
     fn try_from(ret_value: RetValue) -> Result<ObjectPtr<T>, Self::Error> {
+        use crate::ffi::DLTensor;
+        use crate::ndarray::NDArrayContainer;
+
         match ret_value {
             RetValue::ObjectHandle(handle) => {
                 let optr = ObjectPtr::from_raw(handle as *mut Object).ok_or(Error::Null)?;
                 debug_assert!(optr.count() >= 1);
-                println!("back to type {}", optr.count());
                 optr.downcast()
             }
-            _ => Err(Error::downcast(format!("{:?}", ret_value), "ObjectHandle")),
+            RetValue::NDArrayHandle(handle) => {
+                let optr: ObjectPtr<NDArrayContainer> =
+                    NDArrayContainer::from_raw(handle as *mut DLTensor).ok_or(Error::Null)?;
+                debug_assert!(optr.count() >= 1);
+                optr.upcast::<Object>().downcast()
+            }
+            _ => Err(Error::downcast(format!("{:?}", ret_value), T::TYPE_KEY)),
         }
     }
 }
@@ -301,9 +319,22 @@ impl<'a, T: IsObject> TryFrom<RetValue> for ObjectPtr<T> {
 impl<'a, T: IsObject> From<ObjectPtr<T>> for ArgValue<'a> {
     fn from(object_ptr: ObjectPtr<T>) -> ArgValue<'a> {
         debug_assert!(object_ptr.count() >= 1);
-        let raw_ptr = ObjectPtr::leak(object_ptr) as *mut T as *mut std::ffi::c_void;
-        assert!(!raw_ptr.is_null());
-        ArgValue::ObjectHandle(raw_ptr)
+        let object_ptr = object_ptr.upcast::<Object>();
+        match T::TYPE_KEY {
+            "runtime.NDArray" => {
+                use crate::ndarray::NDArrayContainer;
+                // TODO(this is probably not optimal)
+                let raw_ptr = NDArrayContainer::leak(object_ptr.downcast().unwrap())
+                    as *mut NDArrayContainer as *mut std::ffi::c_void;
+                assert!(!raw_ptr.is_null());
+                ArgValue::NDArrayHandle(raw_ptr)
+            }
+            _ => {
+                let raw_ptr = ObjectPtr::leak(object_ptr) as *mut Object as *mut std::ffi::c_void;
+                assert!(!raw_ptr.is_null());
+                ArgValue::ObjectHandle(raw_ptr)
+            }
+        }
     }
 }
 
@@ -311,17 +342,43 @@ impl<'a, T: IsObject> TryFrom<ArgValue<'a>> for ObjectPtr<T> {
     type Error = Error;
 
     fn try_from(arg_value: ArgValue<'a>) -> Result<ObjectPtr<T>, Self::Error> {
+        use crate::ffi::DLTensor;
+        use crate::ndarray::NDArrayContainer;
+
         match arg_value {
             ArgValue::ObjectHandle(handle) => {
                 let optr = ObjectPtr::from_raw(handle as *mut Object).ok_or(Error::Null)?;
                 debug_assert!(optr.count() >= 1);
-                println!("count: {}", optr.count());
                 optr.downcast()
+            }
+            ArgValue::NDArrayHandle(handle) => {
+                let optr =
+                    NDArrayContainer::from_raw(handle as *mut DLTensor).ok_or(Error::Null)?;
+                debug_assert!(optr.count() >= 1);
+                optr.upcast::<Object>().downcast()
             }
             _ => Err(Error::downcast(format!("{:?}", arg_value), "ObjectHandle")),
         }
     }
 }
+
+impl<T: IsObject> std::hash::Hash for ObjectPtr<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_i64(
+            super::structural_hash(ObjectRef(Some(self.clone().upcast())), false).unwrap(),
+        )
+    }
+}
+
+impl<T: IsObject> PartialEq for ObjectPtr<T> {
+    fn eq(&self, other: &Self) -> bool {
+        let lhs = ObjectRef(Some(self.clone().upcast()));
+        let rhs = ObjectRef(Some(other.clone().upcast()));
+        super::structural_equal(lhs, rhs, false, false).unwrap()
+    }
+}
+
+impl<T: IsObject> Eq for ObjectPtr<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -332,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_new_object() -> anyhow::Result<()> {
-        let object = Object::base_object::<Object>();
+        let object = Object::base::<Object>();
         let ptr = ObjectPtr::new(object);
         assert_eq!(ptr.count(), 1);
         Ok(())
@@ -340,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_leak() -> anyhow::Result<()> {
-        let ptr = ObjectPtr::new(Object::base_object::<Object>());
+        let ptr = ObjectPtr::new(Object::base::<Object>());
         assert_eq!(ptr.count(), 1);
         let object = ObjectPtr::leak(ptr);
         assert_eq!(object.count(), 1);
@@ -349,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_clone() -> anyhow::Result<()> {
-        let ptr = ObjectPtr::new(Object::base_object::<Object>());
+        let ptr = ObjectPtr::new(Object::base::<Object>());
         assert_eq!(ptr.count(), 1);
         let ptr2 = ptr.clone();
         assert_eq!(ptr2.count(), 2);
@@ -360,7 +417,7 @@ mod tests {
 
     #[test]
     fn roundtrip_retvalue() -> Result<()> {
-        let ptr = ObjectPtr::new(Object::base_object::<Object>());
+        let ptr = ObjectPtr::new(Object::base::<Object>());
         assert_eq!(ptr.count(), 1);
         let ret_value: RetValue = ptr.clone().into();
         let ptr2: ObjectPtr<Object> = ret_value.try_into()?;
@@ -382,7 +439,7 @@ mod tests {
 
     #[test]
     fn roundtrip_argvalue() -> Result<()> {
-        let ptr = ObjectPtr::new(Object::base_object::<Object>());
+        let ptr = ObjectPtr::new(Object::base::<Object>());
         assert_eq!(ptr.count(), 1);
         let ptr_clone = ptr.clone();
         assert_eq!(ptr.count(), 2);
@@ -412,40 +469,11 @@ mod tests {
         return o;
     }
 
-    // #[test]
-    // fn test_ref_count_boundary() {
-    //     use super::*;
-    //     use crate::function::{register, Function, Result};
-    //     // 1
-    //     let ptr = ObjectPtr::new(Object::base_object::<Object>());
-    //     assert_eq!(ptr.count(), 1);
-    //     // 2
-    //     let stay = ptr.clone();
-    //     assert_eq!(ptr.count(), 2);
-    //     register(test_fn, "my_func").unwrap();
-    //     let func = Function::get("my_func").unwrap();
-    //     let func = func.to_boxed_fn::<dyn Fn(ObjectPtr<Object>) -> Result<ObjectPtr<Object>>>();
-    //     let same = func(ptr).unwrap();
-    //     drop(func);
-    //     assert_eq!(stay.count(), 4);
-    //     assert_eq!(same.count(), 4);
-    //     drop(same);
-    //     assert_eq!(stay.count(), 3);
-    // }
-
-    // fn test_fn2(o: ArgValue<'static>) -> RetValue {
-    //     // The call machinery adds at least 1 extra count while inside the call.
-    //     match o {
-    //         ArgValue::ObjectHandle(ptr) => RetValue::ObjectHandle(ptr),
-    //         _ => panic!()
-    //     }
-    // }
-
     #[test]
-    fn test_ref_count_boundary2() {
+    fn test_ref_count_boundary3() {
         use super::*;
         use crate::function::{register, Function};
-        let ptr = ObjectPtr::new(Object::base_object::<Object>());
+        let ptr = ObjectPtr::new(Object::base::<Object>());
         assert_eq!(ptr.count(), 1);
         let stay = ptr.clone();
         assert_eq!(ptr.count(), 2);

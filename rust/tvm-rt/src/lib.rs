@@ -17,7 +17,7 @@
  * under the License.
  */
 
-//! [TVM](https://github.com/apache/incubator-tvm) is a compiler stack for deep learning systems.
+//! [TVM](https://github.com/apache/tvm) is a compiler stack for deep learning systems.
 //!
 //! This crate provides an idiomatic Rust API for TVM runtime.
 //!
@@ -95,6 +95,7 @@ pub mod array;
 pub mod context;
 pub mod errors;
 pub mod function;
+pub mod map;
 pub mod module;
 pub mod ndarray;
 mod to_function;
