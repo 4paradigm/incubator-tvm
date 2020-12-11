@@ -206,7 +206,7 @@ with autotvm.tophub.context(target):
                 "ext_dev": target
             }
         with vta.build_config(opt_level=3, disabled_pass={"AlterOpLayout"}):
-            lib = relay.build(relay_prog, target=target, params=params, target_host=env.target_host)
+            graph, lib, params = relay.build(relay_prog, target=target, params=params, target_host=env.target_host)
 
     # Measure Relay build time
     build_time = time.time() - build_start
