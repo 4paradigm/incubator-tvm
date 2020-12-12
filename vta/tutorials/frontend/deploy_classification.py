@@ -254,6 +254,7 @@ image = image[np.newaxis, :]
 image = np.repeat(image, env.BATCH, axis=0)
 
 # Set the network parameters and inputs
+m.set_input(**params)
 m.set_input("data", image)
 
 # Perform inference and gather execution statistics
