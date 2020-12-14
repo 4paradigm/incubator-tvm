@@ -27,6 +27,8 @@
 #include "runtime.h"
 
 #include <dmlc/logging.h>
+#include <malloc.h>
+#include <stdlib.h>
 #include <tvm/runtime/c_runtime_api.h>
 #include <vta/driver.h>
 #include <vta/hw_spec.h>
@@ -35,13 +37,10 @@
 #include <cassert>
 #include <cstring>
 #include <memory>
-#include <vector>
-#include <set>
-#include <stdlib.h>
-#include <malloc.h>
-
-#include <thread>
 #include <mutex>
+#include <set>
+#include <thread>
+#include <vector>
 
 namespace vta {
 
@@ -73,49 +72,31 @@ class AlignmentAllocator : public std::allocator<T> {
 
   inline ~AlignmentAllocator() throw() {}
 
-  inline pointer address(reference r) {
-    return &r;
-  }
+  inline pointer address(reference r) { return &r; }
 
-  inline const_pointer address(const_reference r) const {
-    return &r;
-  }
+  inline const_pointer address(const_reference r) const { return &r; }
 
-  inline pointer allocate(size_type n) {
-     return (pointer)memalign(N, n * sizeof(value_type));
-  }
+  inline pointer allocate(size_type n) { return (pointer)memalign(N, n * sizeof(value_type)); }
 
-  inline void deallocate(pointer p, size_type) {
-    free(p);
-  }
+  inline void deallocate(pointer p, size_type) { free(p); }
 
-  inline void construct(pointer p, const value_type& wert) {
-     new (p) value_type(wert);
-  }
+  inline void construct(pointer p, const value_type& wert) { new (p) value_type(wert); }
 
-  inline void destroy(pointer p) {
-    p->~value_type();
-  }
+  inline void destroy(pointer p) { p->~value_type(); }
 
-  inline size_type max_size() const throw() {
-    return size_type (-1) / sizeof (value_type);
-  }
+  inline size_type max_size() const throw() { return size_type(-1) / sizeof(value_type); }
 
   template <typename T2>
   struct rebind {
     typedef AlignmentAllocator<T2, N> other;
   };
 
-  bool operator!=(const AlignmentAllocator<T,N>& other) const  {
-    return !(*this == other);
-  }
+  bool operator!=(const AlignmentAllocator<T, N>& other) const { return !(*this == other); }
 
   // Returns true if and only if storage allocated from *this
   // can be deallocated from other, and vice versa.
   // Always returns true for stateless allocators.
-  bool operator==(const AlignmentAllocator<T,N>& other) const {
-    return true;
-  }
+  bool operator==(const AlignmentAllocator<T, N>& other) const { return true; }
 };
 
 class DeviceAllocStat {
@@ -147,9 +128,7 @@ static std::shared_ptr<DeviceAllocStat> alloc_stat(new DeviceAllocStat());
  * \brief Data buffer represents data on CMA.
  */
 struct DataBuffer {
-  DataBuffer() {
-    alloc_stat_ = alloc_stat;
-  }
+  DataBuffer() { alloc_stat_ = alloc_stat; }
 
   /*! \return Virtual address of the data. */
   void* virt_addr() const { return data_; }
@@ -221,8 +200,7 @@ struct DataBuffer {
    */
   static DataBuffer* FromHandle(const void* buffer) {
     if (alloc_stat->CheckAlloc(buffer)) {
-      return const_cast<DataBuffer*>(
-          reinterpret_cast<const DataBuffer*>(buffer));
+      return const_cast<DataBuffer*>(reinterpret_cast<const DataBuffer*>(buffer));
     } else {
       return nullptr;
     }
@@ -235,7 +213,8 @@ struct DataBuffer {
   vta_phy_addr_t phy_addr_;
 
   // a copy of global shared_ptr instance
-  // to avoid the global instance is destructed before there are still some pending DataBuffers not destructed
+  // to avoid the global instance is destructed before there are still some pending DataBuffers not
+  // destructed
   std::shared_ptr<DeviceAllocStat> alloc_stat_;
 };
 
@@ -549,7 +528,7 @@ class UopQueue : public BaseQueue<VTAUop> {
       total_size += ksize;
     }
 
-    char *lbuf = (char*)memalign(ALLOC_ALIGNMENT, total_size);
+    char* lbuf = (char*)memalign(ALLOC_ALIGNMENT, total_size);
     uint32_t offset = 0;
     for (uint32_t i = 0; i < cache_.size(); ++i) {
       uint32_t ksize = cache_[i]->size() * kElemBytes;
@@ -964,7 +943,8 @@ class InsnQueue : public BaseQueue<VTAGenericInsn> {
     if (insn->opcode == VTA_OPCODE_ALU) return kComputeStage;
     if (insn->opcode == VTA_OPCODE_LOAD) {
       if (insn->x_size == 0) return kNoneStage;
-      if (insn->memory_type == VTA_MEM_ID_ACC || insn->memory_type == VTA_MEM_ID_ACC_8BIT) return kComputeStage;
+      if (insn->memory_type == VTA_MEM_ID_ACC || insn->memory_type == VTA_MEM_ID_ACC_8BIT)
+        return kComputeStage;
       if (insn->memory_type == VTA_MEM_ID_UOP) return kComputeStage;
       return kLoadStage;
     }
