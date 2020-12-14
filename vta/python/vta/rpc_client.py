@@ -17,10 +17,10 @@
 """VTA RPC client function"""
 import os
 
-from .environment import get_env
-from .bitstream import download_bitstream, get_bitstream_path
 from tvm import rpc
 from vta import program_bitstream
+from .environment import get_env
+from .bitstream import download_bitstream, get_bitstream_path
 
 
 def reconfig_runtime(remote):

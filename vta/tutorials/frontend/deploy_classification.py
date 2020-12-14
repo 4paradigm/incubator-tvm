@@ -189,7 +189,9 @@ with autotvm.tophub.context(target):
                 env.BLOCK_OUT,
                 env.WGT_WIDTH,
                 start_name=pack_dict[model][0],
-                stop_name=pack_dict[model][1], device_annot=(env.TARGET == "intelfocl" or env.TARGET == "sim"))
+                stop_name=pack_dict[model][1],
+                device_annot=(env.TARGET == "intelfocl" or env.TARGET == "sim"),
+            )
     else:
         relay_prog = mod["main"]
 
@@ -202,12 +204,11 @@ with autotvm.tophub.context(target):
     else:
         if env.TARGET == "intelfocl" or env.TARGET == "sim":
             # multiple targets to run both on cpu and vta
-            target = {
-                "cpu": env.target_vta_cpu,
-                "ext_dev": target
-            }
+            target = {"cpu": env.target_vta_cpu, "ext_dev": target}
         with vta.build_config(opt_level=3, disabled_pass={"AlterOpLayout"}):
-            graph, lib, params = relay.build(relay_prog, target=target, params=params, target_host=env.target_host)
+            graph, lib, params = relay.build(
+                relay_prog, target=target, params=params, target_host=env.target_host
+            )
 
     # Measure Relay build time
     build_time = time.time() - build_start

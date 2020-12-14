@@ -582,8 +582,7 @@ def InjectDMAIntrin():
             )
 
             if data_type != src.dtype:
-                assert(data_type == "int%d" % env.ACC_WIDTH and \
-                       src.dtype == "int%d" % env.INP_WIDTH)
+                assert data_type == "int%d" % env.ACC_WIDTH and src.dtype == "int%d" % env.INP_WIDTH
                 mem_type = env.dev.MEM_ID_ACC_8BIT
 
             irb = tvm.tir.ir_builder.create()

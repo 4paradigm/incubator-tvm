@@ -45,7 +45,7 @@ import copy
 def compile_network(env, target, model, start_pack, stop_pack):
 
     # Populate the shape and data type dictionary
-    dtype_dict = {"data": 'float32'}
+    dtype_dict = {"data": "float32"}
     shape_dict = {"data": (env.BATCH, 3, 224, 224)}
 
     # Get off the shelf gluon model, and convert to relay
@@ -65,12 +65,14 @@ def compile_network(env, target, model, start_pack, stop_pack):
     # Perform graph packing and constant folding for VTA target
     if target.device_name == "vta":
         assert env.BLOCK_IN == env.BLOCK_OUT
-        relay_prog = graph_pack(mod["main"],
-                                env.BATCH,
-                                env.BLOCK_OUT,
-                                env.WGT_WIDTH,
-                                start_name=start_pack,
-                                stop_name=stop_pack)
+        relay_prog = graph_pack(
+            mod["main"],
+            env.BATCH,
+            env.BLOCK_OUT,
+            env.WGT_WIDTH,
+            start_name=start_pack,
+            stop_name=stop_pack,
+        )
 
     return relay_prog, params
 
@@ -82,7 +84,7 @@ def compile_network(env, target, model, start_pack, stop_pack):
 # Here we use an Pynq-Z1 board as an example.
 
 # Tracker host and port can be set by your environment
-tracker_host = os.environ.get("TVM_TRACKER_HOST", '0.0.0.0')
+tracker_host = os.environ.get("TVM_TRACKER_HOST", "0.0.0.0")
 tracker_port = int(os.environ.get("TVM_TRACKER_PORT", 9190))
 
 # Load VTA parameters from the vta/config/vta_config.json file
@@ -105,25 +107,25 @@ stop_pack = "nn.global_avg_pool2d"
 # Tuning option
 log_file = "%s.alu.%s.log" % (device, network)
 tuning_option = {
-    'log_filename': log_file,
-
-    'tuner': 'random',
-    'n_trial': 1000,
-    'early_stopping': None,
-
-    'measure_option': autotvm.measure_option(
+    "log_filename": log_file,
+    "tuner": "random",
+    "n_trial": 1000,
+    "early_stopping": None,
+    "measure_option": autotvm.measure_option(
         builder=autotvm.LocalBuilder(n_parallel=1),
-        runner=autotvm.RPCRunner(env.TARGET,
-                                 host=tracker_host,
-                                 port=tracker_port,
-                                 number=5,
-                                 timeout=60,
-                                 check_correctness=True),
+        runner=autotvm.RPCRunner(
+            env.TARGET,
+            host=tracker_host,
+            port=tracker_port,
+            number=5,
+            timeout=60,
+            check_correctness=True,
+        ),
     ),
 }
 
 
-def log_to_file(file_out, protocol='json'):
+def log_to_file(file_out, protocol="json"):
     """Log the tuning records into file.
     The rows of the log are stored in the format of autotvm.record.encode.
     for lhs == rhs, we add an extra rhs = [] record
@@ -140,6 +142,7 @@ def log_to_file(file_out, protocol='json'):
     callback : callable
         Callback function to do the logging.
     """
+
     def _callback(_, inputs, results):
         with open(file_out, "a") as f:
             for inp, result in zip(inputs, results):
@@ -156,13 +159,15 @@ def log_to_file(file_out, protocol='json'):
     return _callback
 
 
-def tune_tasks(tasks,
-               measure_option,
-               tuner='xgb',
-               n_trial=10,
-               early_stopping=None,
-               log_filename='tuning.log',
-               use_transfer_learning=True):
+def tune_tasks(
+    tasks,
+    measure_option,
+    tuner="xgb",
+    n_trial=10,
+    early_stopping=None,
+    log_filename="tuning.log",
+    use_transfer_learning=True,
+):
 
     # create tmp log file
     tmp_log_file = log_filename + ".tmp"
@@ -173,15 +178,15 @@ def tune_tasks(tasks,
         prefix = "[Task %2d/%2d] " % (i + 1, len(tasks))
 
         # create tuner
-        if tuner == 'xgb' or tuner == 'xgb-rank':
-            tuner_obj = XGBTuner(tsk, loss_type='rank')
-        elif tuner == 'xgb_knob':
-            tuner_obj = XGBTuner(tsk, loss_type='rank', feature_type='knob')
-        elif tuner == 'ga':
+        if tuner == "xgb" or tuner == "xgb-rank":
+            tuner_obj = XGBTuner(tsk, loss_type="rank")
+        elif tuner == "xgb_knob":
+            tuner_obj = XGBTuner(tsk, loss_type="rank", feature_type="knob")
+        elif tuner == "ga":
             tuner_obj = GATuner(tsk, pop_size=50)
-        elif tuner == 'random':
+        elif tuner == "random":
             tuner_obj = RandomTuner(tsk)
-        elif tuner == 'gridsearch':
+        elif tuner == "gridsearch":
             tuner_obj = GridSearchTuner(tsk)
         else:
             raise ValueError("Invalid tuner: " + tuner)
@@ -192,13 +197,15 @@ def tune_tasks(tasks,
 
         # do tuning
         tsk_trial = min(n_trial, len(tsk.config_space))
-        tuner_obj.tune(n_trial=tsk_trial,
-                       early_stopping=early_stopping,
-                       measure_option=measure_option,
-                       callbacks=[
-                           autotvm.callback.progress_bar(tsk_trial, prefix=prefix),
-                           log_to_file(tmp_log_file)
-                       ])
+        tuner_obj.tune(
+            n_trial=tsk_trial,
+            early_stopping=early_stopping,
+            measure_option=measure_option,
+            callbacks=[
+                autotvm.callback.progress_bar(tsk_trial, prefix=prefix),
+                log_to_file(tmp_log_file),
+            ],
+        )
 
     # pick best records to a cache file
     autotvm.record.pick_best(tmp_log_file, log_filename)
@@ -232,7 +239,7 @@ def register_vta_tuning_tasks():
             res = my_clip(res, 0, 127)
             res = topi.cast(res, "int8")
 
-        if tvm.target.Target.current().device_name == 'vta':
+        if tvm.target.Target.current().device_name == "vta":
             s = vta.top.op.schedule_add_packed([res])
         else:
             s = te.create_schedule([res.op])
@@ -248,7 +255,7 @@ def register_vta_tuning_tasks():
             res = my_clip(res, 0, 127)
             res = topi.cast(res, "int8")
 
-        if tvm.target.Target.current().device_name == 'vta':
+        if tvm.target.Target.current().device_name == "vta":
             s = vta.top.op.schedule_multiply_packed([res])
         else:
             s = te.create_schedule([res.op])
@@ -270,11 +277,16 @@ def tune_and_evaluate(tuning_opt):
     print("Extract tasks...")
     relay_prog, params = compile_network(env, target, network, start_pack, stop_pack)
     mod = tvm.IRModule.from_expr(relay_prog)
-    tasks = autotvm.task.extract_from_program(mod,
-                                              params=params,
-                                              ops=(relay.op.get("add"), relay.op.get("multiply"),),
-                                              target=target,
-                                              target_host=env.target_host)
+    tasks = autotvm.task.extract_from_program(
+        mod,
+        params=params,
+        ops=(
+            relay.op.get("add"),
+            relay.op.get("multiply"),
+        ),
+        target=target,
+        target_host=env.target_host,
+    )
 
     # filter out non-packed alu task
     tasks = list(filter(lambda t: len(t.args[0][1]) > 4, tasks))

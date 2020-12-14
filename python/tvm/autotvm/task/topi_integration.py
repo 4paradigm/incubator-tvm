@@ -252,8 +252,8 @@ def get_workload(outs, task_name=None):
             if wkl:
                 return wkl
 
-            if 'workload' in op.attrs:
-                ret = args_to_workload(op.attrs['workload'])
+            if "workload" in op.attrs:
+                ret = args_to_workload(op.attrs["workload"])
                 if ret[0] == task_name:
                     return ret
         return None
