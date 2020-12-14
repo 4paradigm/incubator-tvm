@@ -130,9 +130,9 @@ def schedule_alu_packed(cfg, outs):
         cfg.define_split('tile_h', x_i, num_outputs=2)
         cfg.define_split('tile_w', x_j, num_outputs=2)
 
-        x_co_max = topi.util.get_const_int(x_bo.dom.extent)
-        x_i_max = topi.util.get_const_int(x_i.dom.extent)
-        x_j_max = topi.util.get_const_int(x_j.dom.extent)
+        x_co_max = topi.utils.get_const_int(x_bo.dom.extent)
+        x_i_max = topi.utils.get_const_int(x_i.dom.extent)
+        x_j_max = topi.utils.get_const_int(x_j.dom.extent)
 
         x_co0, x_co1 = cfg['tile_co'].apply(s, output, x_co)
         x_i0, x_i1 = cfg['tile_h'].apply(s, output, x_i)

@@ -60,6 +60,7 @@ import vta
 from vta.testing import simulator
 from vta.top import graph_pack
 
+
 # Make sure that TVM was compiled with RPC=1
 assert tvm.runtime.enabled("rpc")
 
@@ -133,7 +134,7 @@ else:
 
     if env.TARGET in ["intelfocl"]:
         # program intelfocl aocx
-        vta.program_fpga(remote, bitstream="vta_opencl.aocx")
+        vta.program_fpga(remote, bitstream="vta.bitstream")
 
 # Get execution context from remote
 ctx = remote.ext_dev(0) if device == "vta" else remote.cpu(0)

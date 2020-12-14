@@ -94,6 +94,10 @@ if env.TARGET == "pynq" or env.TARGET == "de10nano":
 elif env.TARGET in ("sim", "tsim", "intelfocl"):
     remote = rpc.LocalSession()
 
+    if env.TARGET in ["intelfocl"]:
+        # program intelfocl aocx
+        vta.program_fpga(remote, bitstream="vta.bitstream")
+
 ######################################################################
 # Computation Declaration
 # -----------------------

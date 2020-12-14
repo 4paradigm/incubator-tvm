@@ -60,7 +60,7 @@ def de10nano_bitstream_program(bitstream_path):
 def intelfocl_bitstream_program(bitstream_path, mem_size=4*1024*1024*1024):
     # pylint: disable=import-outside-toplevel
     from tvm import get_global_func
-    program = get_global_func("vta.intelfocl.program")
+    program = get_global_func("vta.oclfpga.program")
     program(bitstream_path, mem_size)
 
 
