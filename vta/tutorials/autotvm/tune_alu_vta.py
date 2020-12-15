@@ -266,8 +266,8 @@ def register_vta_tuning_tasks():
 # Finally, we launch tuning jobs and evaluate the end-to-end performance.
 def tune_and_evaluate(tuning_opt):
 
-    if env.TARGET != "intelfocl":
-        print("ALU only op only available for intelfocl target")
+    if env.TARGET not in ["intelfocl", "xilinxvitis"]:
+        print("ALU only op only available for intelfocl/xilinxvitis target")
         return
 
     # Register VTA tuning tasks

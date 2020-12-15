@@ -234,7 +234,7 @@ class Environment(object):
             return "llvm -mtriple=armv7-none-linux-gnueabihf"
         if self.TARGET == "ultra96":
             return "llvm -mtriple=aarch64-linux-gnu"
-        if self.TARGET in ["sim", "tsim", "intelfocl"]:
+        if self.TARGET in ["sim", "tsim", "intelfocl", "xilinxvitis"]:
             return "llvm"
         raise ValueError("Unknown target %s" % self.TARGET)
 

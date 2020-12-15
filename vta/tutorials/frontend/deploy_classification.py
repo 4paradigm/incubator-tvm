@@ -100,7 +100,7 @@ assert model in pack_dict
 # When target is 'pynq', reconfigure FPGA and runtime.
 # Otherwise, if target is 'sim', execute locally.
 
-if env.TARGET not in ["sim", "tsim", "intelfocl"]:
+if env.TARGET not in ["sim", "tsim", "intelfocl", "xilinxvitis"]:
 
     # Get remote from tracker node if environment variable is set.
     # To set up the tracker, you'll need to follow the "Auto-tuning
@@ -132,8 +132,8 @@ if env.TARGET not in ["sim", "tsim", "intelfocl"]:
 else:
     remote = rpc.LocalSession()
 
-    if env.TARGET in ["intelfocl"]:
-        # program intelfocl aocx
+    if env.TARGET in ["intelfocl", "xilinxvitis"]:
+        # program FPGA bitstream 
         vta.program_fpga(remote, bitstream="vta.bitstream")
 
 # Get execution context from remote
@@ -190,7 +190,7 @@ with autotvm.tophub.context(target):
                 env.WGT_WIDTH,
                 start_name=pack_dict[model][0],
                 stop_name=pack_dict[model][1],
-                device_annot=(env.TARGET == "intelfocl" or env.TARGET == "sim"),
+                device_annot=(env.TARGET in ["sim", "intelfocl", "xilinxvitis"]),
             )
     else:
         relay_prog = mod["main"]
@@ -202,7 +202,7 @@ with autotvm.tophub.context(target):
                 relay_prog, target=target, params=params, target_host=env.target_host
             )
     else:
-        if env.TARGET == "intelfocl" or env.TARGET == "sim":
+        if env.TARGET in ["sim", "intelfocl", "xilinxvitis"]:
             # multiple targets to run both on cpu and vta
             target = {"cpu": env.target_vta_cpu, "ext_dev": target}
         with vta.build_config(opt_level=3, disabled_pass={"AlterOpLayout"}):
@@ -220,7 +220,7 @@ with autotvm.tophub.context(target):
     remote.upload(temp.relpath("graphlib.tar"))
     lib = remote.load_module("graphlib.tar")
 
-    if env.TARGET == "intelfocl" or env.TARGET == "sim":
+    if env.TARGET in ["sim", "intelfocl", "xilinxvitis"]:
         ctxes = [remote.ext_dev(0), remote.cpu(0)]
         m = graph_runtime.create(graph, lib, ctxes)
     else:

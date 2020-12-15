@@ -30,7 +30,7 @@ def _load_sw():
         "libvta_tsim"
         if env.TARGET == ""
         else "libvta"
-        if env.TARGET == "intelfocl"
+        if env.TARGET in ["intelfocl", "xilinxvitis"]
         else "libvta_fsim"
     )
 

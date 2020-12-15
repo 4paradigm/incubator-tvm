@@ -89,7 +89,7 @@ def schedule_alu_packed(cfg, outs):
     te.schedule.AutoInlineInjective(s)
 
     # other target does not support alu-only ops
-    if not (ENV.TARGET in ["sim", "tsim", "intelfocl"]):
+    if not (ENV.TARGET in ["sim", "tsim", "intelfocl", "xilinxvitis"]):
         return s
 
     # only put the int-related ops to vta
@@ -192,7 +192,7 @@ def multiply_strategy_vta(attrs, inputs, out_type, target):
 
 
 # other target does not support alu-only ops
-if ENV.TARGET in ["sim", "intelfocl"]:
+if ENV.TARGET in ["sim", "intelfocl", "xilinxvitis"]:
     reg.get("add").get_attr("FTVMStrategy").register(add_strategy_vta, "vta")
     reg.get("multiply").get_attr("FTVMStrategy").register(multiply_strategy_vta, "vta")
 

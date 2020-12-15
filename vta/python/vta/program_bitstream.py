@@ -64,6 +64,12 @@ def intelfocl_bitstream_program(bitstream_path, mem_size=4 * 1024 * 1024 * 1024)
     program = get_global_func("vta.oclfpga.program")
     program(bitstream_path, mem_size)
 
+def xilinxvitis_bitstream_program(bitstream_path, mem_size=2 * 1024 * 1024 * 1024):
+    # pylint: disable=import-outside-toplevel
+    from tvm import get_global_func
+
+    program = get_global_func("vta.oclfpga.program")
+    program(bitstream_path, mem_size)
 
 def bitstream_program(target, bitstream, *args):
     """program bitstream to devices"""
@@ -77,6 +83,8 @@ def bitstream_program(target, bitstream, *args):
         return
     elif target in ["intelfocl"]:
         intelfocl_bitstream_program(bitstream, *args)
+    elif target in ["xilinxvitis"]:
+        xilinxvitis_bitstream_program(bitstream, *args)
     else:
         raise RuntimeError("Unknown target {}".format(target))
 
