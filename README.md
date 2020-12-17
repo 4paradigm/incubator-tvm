@@ -1,47 +1,52 @@
-<!--- Licensed to the Apache Software Foundation (ASF) under one -->
-<!--- or more contributor license agreements.  See the NOTICE file -->
-<!--- distributed with this work for additional information -->
-<!--- regarding copyright ownership.  The ASF licenses this file -->
-<!--- to you under the Apache License, Version 2.0 (the -->
-<!--- "License"); you may not use this file except in compliance -->
-<!--- with the License.  You may obtain a copy of the License at -->
+Canopy: FPGA-Accelerated Deep Learning Compiler Stack
+===
 
-<!---   http://www.apache.org/licenses/LICENSE-2.0 -->
+## Introduction
 
-<!--- Unless required by applicable law or agreed to in writing, -->
-<!--- software distributed under the License is distributed on an -->
-<!--- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY -->
-<!--- KIND, either express or implied.  See the License for the -->
-<!--- specific language governing permissions and limitations -->
-<!--- under the License. -->
+Canopy is an evolved version of Apache TVM developed by 4Paradigm. TVM is an open-source deep learning compiler stack that supports a variety of hardware backends, such as CPUs, GPUs, and FPGAs. However, the supported FPGA is only limited to SoC FPGAs with the shared memory space between an ARM core and FPGA. Based on such a hardware architecture, modern high-end PCIE-based cloud FPGAs cannot take advantage from TVM because of the separate memory space between the host and FPGA. Therefore, the major purpose of Canopy project is to enable the open-source deep learning compiler stack to run efficiently on PCIE-based high-end FPGAs. Compared with TVM, there are three major contributions:
 
-<img src=https://raw.githubusercontent.com/apache/tvm-site/main/images/logo/tvm-logo-small.png width=128/> Open Deep Learning Compiler Stack
-==============================================
-[Documentation](https://tvm.apache.org/docs) |
-[Contributors](CONTRIBUTORS.md) |
-[Community](https://tvm.apache.org/community) |
-[Release Notes](NEWS.md)
+- We have designed the PCIE driver to adapt to the TVM framework, which makes it possible to work with PCIE-based FPGA cards.
+- We have defined and implemented the underlying FPGA-based accelerator using high-level synthesis languages OpenCL. Therefore, any hardware accelerators with OpenCL support can be integrated into Canopy with minimum code modification efforts.
+- We have extended and fixed a few issues from TVM to make it support FPGA smoothly.
 
-[![Build Status](https://ci.tlcpack.ai/buildStatus/icon?job=tvm/main)](https://ci.tlcpack.ai/job/tvm/job/main/)
-[![WinMacBuild](https://github.com/apache/tvm/workflows/WinMacBuild/badge.svg)](https://github.com/apache/tvm/actions?query=workflow%3AWinMacBuild)
+As a result, Canopy is able to compile and run deep learning models on PCIE-based high-end FPGAs. Our design supports both Intel and Xilinx's FPGAs, and has been tested on Intel Arria 10, Stratix 10, and AWS F1 instances (with Xilinx Virtex UltraScale+).
 
-Apache TVM (incubating) is a compiler stack for deep learning systems. It is designed to close the gap between the
-productivity-focused deep learning frameworks, and the performance- and efficiency-focused hardware backends.
-TVM works with deep learning frameworks to provide end to end compilation to different backends.
+`Note that we have open-sourced the baseline version of Canopy. For any commercial supports, customized design, and further improvement, please contact 4Paradigm: LU Mian lumian@4paradigm.com`
 
-License
--------
-© Contributors Licensed under an [Apache-2.0](LICENSE) license.
+## Contribution to Apache TVM
 
-Contribute to TVM
------------------
-TVM adopts apache committer model, we aim to create an open source project that is maintained and owned by the community.
-Checkout the [Contributor Guide](https://tvm.apache.org/docs/contribute/)
+This repository is forked from Apache TVM (https://github.com/apache/tvm). We greatly appreciate the significant work done by the TVM team that has defined a neat but yet flexible design for deep learning compiler and accelerator research. Meanwhile, we have been contributing most of our work into the TVM community. To understand what we have proposed to the TVM community, please refer to the following RFC and discussion.
 
-Acknowledgement
----------------
-We learned a lot from the following projects when building TVM.
-- [Halide](https://github.com/halide/Halide): Part of TVM's TIR and arithmetic simplification module
-  originates from Halide. We also learned and adapted some part of lowering pipeline from Halide.
-- [Loopy](https://github.com/inducer/loopy): use of integer set analysis and its loop transformation primitives.
-- [Theano](https://github.com/Theano/Theano): the design inspiration of symbolic scan operator for recurrence.
+- https://discuss.tvm.apache.org/t/rfc-vta-support-for-cloud-devices-opencl-compatible/6676
+- https://github.com/apache/tvm/issues/5840
+
+According to the RFC, we have submitted tens of PRs to the TVM community (dated Dec 2020) and more ongoing.
+
+- (merged) https://github.com/apache/tvm-vta/pull/7
+- (merged) https://github.com/apache/tvm-vta/pull/6
+- (merged) https://github.com/apache/tvm/pull/6191
+- (merged) https://github.com/apache/tvm/pull/6124
+- (merged) https://github.com/apache/tvm/pull/6092
+- (merged) https://github.com/apache/tvm/pull/5470
+- (approved) https://github.com/apache/tvm-vta/pull/9
+- https://github.com/apache/tvm-vta/pull/8
+- https://github.com/apache/tvm/pull/6126
+- https://github.com/apache/tvm/pull/6125
+- https://github.com/apache/tvm/pull/5842
+- https://github.com/apache/tvm/pull/5471
+
+`However, a more efficient hardware design as well as the Xilinx FPGA support are included only in this repository. We strongly recommend you to start your evaluation on AWS EC2 F1 instances as following, which is easy to develop, compile, and deploy your models.`
+
+## Evaluation on Amazon EC2 F1 Instances
+
+## Workshop Talks
+
+https://www.youtube.com/watch?v=6Qg7R6EuAjE
+
+## Development Team
+
+Canopy is an open-source project developed by the HPC team of 4Paradigm. For any technical feedbacks, please contact the authors:
+ZHANG Hao: zhanghao@4paradigm.com
+LI Jiashu: lijiashu@4paradigm.com
+LU Mian: lumian@4paradigm.com
+
