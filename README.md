@@ -11,7 +11,11 @@ Canopy is an evolved version of Apache TVM developed by 4Paradigm. TVM is an ope
 
 As a result, Canopy is able to compile and run deep learning models on PCIE-based high-end FPGAs. Our design supports both Intel and Xilinx's FPGAs, and has been tested on Intel Arria 10, Stratix 10, and AWS F1 instances (with Xilinx Virtex UltraScale+).
 
-`Note that we have open-sourced the baseline version of Canopy. For any commercial supports, customized design, and further improvement, please contact 4Paradigm: LU Mian lumian@4paradigm.com`
+**Note that we have open-sourced the baseline version of Canopy. For any commercial supports, customized design, and further improvement, please contact 4Paradigm: LU Mian lumian@4paradigm.com**
+
+## Hardware Implementation
+
+Similar to TVM and VTA, the hardware implementations (including Intel FPGAs and Xilinx FPGAs) are hosted in another repository canopy-hw: https://github.com/4paradigm/canopy-hw
 
 ## Contribution to Apache TVM
 
@@ -28,16 +32,24 @@ According to the RFC, we have submitted tens of PRs to the TVM community (dated 
 - (merged) https://github.com/apache/tvm/pull/6124
 - (merged) https://github.com/apache/tvm/pull/6092
 - (merged) https://github.com/apache/tvm/pull/5470
-- (approved) https://github.com/apache/tvm-vta/pull/9
+- (merged) https://github.com/apache/tvm-vta/pull/9
 - https://github.com/apache/tvm-vta/pull/8
 - https://github.com/apache/tvm/pull/6126
-- https://github.com/apache/tvm/pull/6125
+- (merged) https://github.com/apache/tvm/pull/6125
 - https://github.com/apache/tvm/pull/5842
 - https://github.com/apache/tvm/pull/5471
 
-`However, a more efficient hardware design as well as the Xilinx FPGA support are included only in this repository. We strongly recommend you to start your evaluation on AWS EC2 F1 instances as following, which is easy to develop, compile, and deploy your models.`
+**However, a more efficient hardware design as well as the Xilinx FPGA support are included only in this repository. We strongly recommend you to start your evaluation on AWS EC2 F1 instances as following, which is easy to develop, compile, and deploy your models.**
 
 ## Evaluation on Amazon EC2 F1 Instances
+
+We have packed Canopy with relevant environment dependencies into a single package, you can easily try it on AWS F1 instance to start your evaluation! 
+
+1. Download the package (canopy_aws.tar.gz) from here:
+   https://drive.google.com/file/d/15G_kJDtVMEYwkKbP-tzfIyR0vgSOL_FE/view?usp=sharing
+2. Open the AWS console, and launch your instance by choosing FPGA Developer AMI from AWS Marketplace. Note that your instance type should be f1 (f1.2xlarge, f1.4xlarge, or f1.16xlarge).
+3. Open your terminal, and go to the home directory (should be `/home/centos` by default), upload your package to the home directory.
+4. Decompress the file canopy_aws.tar.gz under the home directory (`/home/centos`, this is important), now you will find a README.md, just follow the instructions to try it.
 
 ## Workshop Talks
 
