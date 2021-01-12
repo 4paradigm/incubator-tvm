@@ -40,7 +40,7 @@ else()
   message(FATAL_ERROR "Invalid option: USE_BLAS=" ${USE_BLAS})
 endif()
 
-if(USE_MKL OR USE_MKL_PATH)
+if(NOT (USE_MKL STREQUAL "OFF") OR NOT (USE_MKL_PATH STREQUAL "none"))
   if(USE_MKL_PATH)
     message(DEPRECATION "USE_MKL_PATH=${USE_MKL_PATH} is deprecated. Use USE_MKL=${USE_MKL_PATH} instead.")
   endif()
