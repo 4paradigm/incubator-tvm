@@ -271,7 +271,7 @@ if env.TARGET in ["sim", "tsim"]:
     sim_stats = simulator.stats()
     print("\nExecution statistics:")
     for k, v in sim_stats.items():
-        # Since we execute the workload many times, we need to normalize stats
+        # Since we execute the workload many times, we need to normalize stats 
         # Note that there is always one warm up run
         # Therefore we divide the overall stats by (num * rep + 1)
         print("\t{:<16}: {:>16}".format(k, v // (num * rep + 1)))
