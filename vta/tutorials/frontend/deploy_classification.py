@@ -220,7 +220,7 @@ with autotvm.tophub.context(target):
     remote.upload(temp.relpath("graphlib.tar"))
     lib = remote.load_module("graphlib.tar")
 
-    if env.TARGET == "intelfocl" or env.TARGET == "sim":
+    if env.TARGET == "sim" or env.TARGET == "intelfocl":
         ctxes = [remote.ext_dev(0), remote.cpu(0)]
         m = graph_runtime.create(graph, lib, ctxes)
     else:
